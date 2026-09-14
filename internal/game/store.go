@@ -185,3 +185,6 @@ func readJSON(path string, v any) error {
 	}
 	return json.Unmarshal(b, v)
 }
+
+// Root returns the persistent data directory used by this store.
+func (s *Store) Root() string { return s.root }

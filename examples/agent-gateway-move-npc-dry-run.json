@@ -1,0 +1,10 @@
+{
+  "tool": "move_npc",
+  "arguments": {
+    "runId": "run_REPLACE_ME",
+    "npcId": "iven",
+    "roomId": "room_25",
+    "dryRun": true,
+    "reason": "玩家已经警告伊文灰疫即将扩散，预览其撤离到灰疫医馆的世界结果"
+  }
+}

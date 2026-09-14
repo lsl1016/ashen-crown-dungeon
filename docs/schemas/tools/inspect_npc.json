@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "inspect",
+    "ashen-crown/risk": "low"
+  },
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "读取 NPC 定义、当前地点、日程状态、关系值、健康/情绪和已知情报。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "npcId": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      }
+    },
+    "required": [
+      "runId",
+      "npcId"
+    ],
+    "type": "object"
+  },
+  "name": "inspect_npc",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Inspect NPC"
+}

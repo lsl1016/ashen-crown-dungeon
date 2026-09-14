@@ -6,6 +6,8 @@ V0.7 在 V0.6 的双幕战役、持续世界、NPC、任务、商店、装备词
 
 > 当前版本仍然**没有接入任何 LLM**。世界事实、规则校验、随机数、任务状态、NPC 位置、战斗结果和内容持久化都由 Game Runtime 决定。未来 DM Agent 只能通过受控 Tool 操作这些能力。
 
+本交付在 V0.7.0 上增加 **AI GM Bridge 1.0**：19 个受控 Agent Tool、JSON Schema、HTTP Tool Gateway、MCP 2026-07-28 Server、dry-run、同 Run 串行锁与 JSONL 审计。它仍然不绑定任何具体 LLM，Agent 可以通过 HTTP 或 MCP 接入。
+
 ## 直接运行
 
 ### Windows
@@ -27,6 +29,35 @@ GM 编辑器：
 ```text
 http://localhost:8080/editor
 ```
+
+AI Tool Gateway：
+
+```text
+GET  http://localhost:8080/api/agent/tools
+POST http://localhost:8080/api/agent/tools/execute
+```
+
+MCP Server（2026-07-28）：
+
+```text
+POST http://localhost:8080/mcp
+```
+
+完整说明：
+
+```text
+docs/AI_GM_GUIDE.md
+docs/MCP_SERVER.md
+```
+
+建议服务端设置：
+
+```bash
+export ASHEN_AGENT_TOKEN="replace-with-secret"
+export ASHEN_AGENT_REQUIRE_REASON="true"
+```
+
+> `ASHEN_AGENT_TOKEN` 为空时仅适合本地开发；公网部署必须在 Gateway 或反向代理层做认证。
 
 压缩包内已经包含 Windows amd64 可执行文件，不需要安装 Go、Node 或 npm。
 

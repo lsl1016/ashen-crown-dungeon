@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "inspect",
+    "ashen-crown/risk": "low"
+  },
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "按类型和关键词搜索合法的房间、NPC、敌人、物品、技能或世界事件 ID。调用 grant_item/spawn_enemy/move_npc 等工具前，不确定 ID 时先搜索。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "kind": {
+        "enum": [
+          "room",
+          "npc",
+          "enemy",
+          "item",
+          "skill",
+          "world_event"
+        ],
+        "type": "string"
+      },
+      "limit": {
+        "default": 10,
+        "maximum": 30,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query": {
+        "maxLength": 80,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      }
+    },
+    "required": [
+      "runId",
+      "kind"
+    ],
+    "type": "object"
+  },
+  "name": "search_catalog",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Search Catalog"
+}

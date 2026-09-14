@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0-ai-gm-bridge-1.0
+
+在 V0.7.0 Living World Runtime 上新增可供外部 Agent 使用的正式 GM 接入层。
+
+- 新增 19 个 Agent Tool：世界/房间/NPC/任务/战斗检查、目录搜索、最近日志、D20 检定、NPC/区域/世界事件/世界钟/Flag/地图/遭遇/奖励操作。
+- 新增统一 `AgentToolDefinitions()`，HTTP、MCP、JSON Schema 与参数校验共用同一事实源。
+- 新增 `/api/agent/tools`、`/api/agent/tools/{name}`、`/api/agent/tools/execute`、`/api/agent/audit`。
+- 新增真实 `dryRun`：在 Run 副本上执行，不写入持久化存档。
+- 新增同 Run 串行锁，降低 Agent 并发修改世界造成竞态的风险。
+- high-risk Tool 默认要求 `reason`，可通过 `ASHEN_AGENT_REQUIRE_REASON` 配置。
+- 新增 `data/audit/agent-tools.jsonl` 审计日志。
+- 新增 Bearer Service Token：`ASHEN_AGENT_TOKEN`。
+- 新增 MCP 2026-07-28 stateless `/mcp`，实现 `server/discover`、`tools/list`、`tools/call`、现代 Header 校验和 `Mcp-Param-Run-Id`。
+- 新增 JSON Schema 导出器 `go run ./cmd/schemaexport -out ./docs/schemas`，输出 Tool Catalog、Gateway Envelope 和每个 Tool Schema。
+- 新增 `docs/AI_GM_GUIDE.md` 与 `docs/MCP_SERVER.md`。
+- 新增三套可打包 Skill：Ashen Crown DM、World Director、Encounter Referee。
+- 核心游戏版本仍为 V0.7.0；本层不绑定任何 LLM Provider。
+
 ## 0.7.0-living-world-editor
 
 V0.7 把 V0.6 的持续状态推进成可调度、可分支、可编辑的 Living World Runtime。

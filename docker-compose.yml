@@ -3,6 +3,9 @@ services:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      ASHEN_AGENT_TOKEN: ${ASHEN_AGENT_TOKEN:-}
+      ASHEN_AGENT_REQUIRE_REASON: ${ASHEN_AGENT_REQUIRE_REASON:-true}
     volumes:
       - ./data:/app/data
     restart: unless-stopped

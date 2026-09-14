@@ -1,0 +1,7 @@
+{
+  "tool": "inspect_world",
+  "arguments": {
+    "runId": "run_REPLACE_ME",
+    "visibility": "gm"
+  }
+}

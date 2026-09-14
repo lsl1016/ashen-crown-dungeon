@@ -1,0 +1,20 @@
+{
+  "$id": "https://ashen-crown.local/schema/agent-tool-execute.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "arguments": {
+      "type": "object"
+    },
+    "tool": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool",
+    "arguments"
+  ],
+  "title": "AI Tool Gateway Execute Request",
+  "type": "object"
+}

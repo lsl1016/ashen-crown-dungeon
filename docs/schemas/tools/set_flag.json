@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "world_mutation",
+    "ashen-crown/risk": "medium"
+  },
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "写入世界事实。已有 Flag 可更新；新 Flag 必须使用 ai. 前缀，避免污染引擎内部标记。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "dryRun": {
+        "default": false,
+        "description": "仅在副本上执行并返回预览，不写入真实 Run。高影响操作应先 dryRun。",
+        "type": "boolean"
+      },
+      "key": {
+        "maxLength": 120,
+        "minLength": 1,
+        "type": "string"
+      },
+      "reason": {
+        "description": "简短说明这次世界修改的剧情/规则原因，便于审计。",
+        "maxLength": 200,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "runId",
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "name": "set_flag",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Set World Flag"
+}

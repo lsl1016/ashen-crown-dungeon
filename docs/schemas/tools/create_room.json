@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "map_mutation",
+    "ashen-crown/risk": "high"
+  },
+  "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "创建一个新地图节点，可选立即连接到现有房间。只创建数据，不允许执行代码或自定义脚本。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "connectTo": {
+        "type": "string"
+      },
+      "description": {
+        "maxLength": 500,
+        "type": "string"
+      },
+      "discovered": {
+        "default": false,
+        "type": "boolean"
+      },
+      "dryRun": {
+        "default": false,
+        "description": "仅在副本上执行并返回预览，不写入真实 Run。高影响操作应先 dryRun。",
+        "type": "boolean"
+      },
+      "id": {
+        "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+        "type": "string"
+      },
+      "name": {
+        "maxLength": 80,
+        "minLength": 1,
+        "type": "string"
+      },
+      "reason": {
+        "description": "简短说明这次世界修改的剧情/规则原因，便于审计。",
+        "maxLength": 200,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      },
+      "type": {
+        "maxLength": 40,
+        "minLength": 1,
+        "type": "string"
+      },
+      "x": {
+        "maximum": 100,
+        "minimum": -100,
+        "type": "integer"
+      },
+      "y": {
+        "maximum": 100,
+        "minimum": -100,
+        "type": "integer"
+      },
+      "zone": {
+        "maxLength": 60,
+        "type": "string"
+      }
+    },
+    "required": [
+      "runId",
+      "id",
+      "name",
+      "type",
+      "x",
+      "y"
+    ],
+    "type": "object"
+  },
+  "name": "create_room",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Create Room"
+}

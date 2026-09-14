@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "rule",
+    "ashen-crown/risk": "medium"
+  },
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "执行由 Game Runtime 决定结果的 D20 属性检定。不要由模型自行掷骰或宣布成功。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "attribute": {
+        "enum": [
+          "strength",
+          "dexterity",
+          "perception",
+          "will"
+        ],
+        "type": "string"
+      },
+      "dc": {
+        "maximum": 30,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "dryRun": {
+        "default": false,
+        "description": "仅在副本上执行并返回预览，不写入真实 Run。高影响操作应先 dryRun。",
+        "type": "boolean"
+      },
+      "label": {
+        "maxLength": 80,
+        "minLength": 1,
+        "type": "string"
+      },
+      "reason": {
+        "description": "简短说明这次世界修改的剧情/规则原因，便于审计。",
+        "maxLength": 200,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      }
+    },
+    "required": [
+      "runId",
+      "attribute",
+      "dc",
+      "label"
+    ],
+    "type": "object"
+  },
+  "name": "roll_check",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Roll Attribute Check"
+}

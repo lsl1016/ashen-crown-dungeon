@@ -9,18 +9,21 @@ import (
 	"strings"
 	"time"
 
+	"ashen-crown-dungeon/internal/agentgateway"
 	"ashen-crown-dungeon/internal/game"
 )
 
 type Server struct {
 	engine *game.Engine
 	store  *game.Store
+	agent  *agentgateway.Gateway
 	mux    *http.ServeMux
 	webDir string
 }
 
 func New(engine *game.Engine, store *game.Store, webDir string) *Server {
 	s := &Server{engine: engine, store: store, mux: http.NewServeMux(), webDir: webDir}
+	s.agent = newAgentGateway(engine, store)
 	s.routes()
 	return s
 }
@@ -28,10 +31,15 @@ func (s *Server) Handler() http.Handler { return logging(s.mux) }
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		jsonOut(w, 200, map[string]any{"ok": true, "name": "ashen-crown-dungeon", "version": "0.7.0"})
+		jsonOut(w, 200, map[string]any{"ok": true, "name": "ashen-crown-dungeon", "version": "0.7.0", "agentGatewayVersion": "1.0", "mcpProtocolVersion": mcpProtocolVersion})
 	})
 	s.mux.HandleFunc("GET /api/world", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, game.World()) })
 	s.mux.HandleFunc("GET /api/tools", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, game.ToolDefinitions()) })
+	s.mux.HandleFunc("GET /api/agent/tools", s.agentTools)
+	s.mux.HandleFunc("GET /api/agent/tools/{name}", s.agentToolDefinition)
+	s.mux.HandleFunc("POST /api/agent/tools/execute", s.agentExecute)
+	s.mux.HandleFunc("GET /api/agent/audit", s.agentAudit)
+	s.mux.HandleFunc("POST /mcp", s.mcp)
 	s.mux.HandleFunc("GET /api/editor/content", s.editorContent)
 	s.mux.HandleFunc("GET /api/editor/overrides", s.editorOverrides)
 	s.mux.HandleFunc("GET /api/editor/runs", s.editorRuns)

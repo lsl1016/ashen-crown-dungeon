@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_meta": {
+    "ashen-crown/category": "encounter",
+    "ashen-crown/risk": "high"
+  },
+  "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "在当前房间生成一个预定义敌人并进入战斗。当前已有战斗时拒绝。",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "dryRun": {
+        "default": false,
+        "description": "仅在副本上执行并返回预览，不写入真实 Run。高影响操作应先 dryRun。",
+        "type": "boolean"
+      },
+      "enemyId": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "reason": {
+        "description": "简短说明这次世界修改的剧情/规则原因，便于审计。",
+        "maxLength": 200,
+        "type": "string"
+      },
+      "runId": {
+        "description": "正在操作的游戏 Run ID。MCP 无隐式会话，因此每次调用都必须显式携带。",
+        "minLength": 1,
+        "type": "string",
+        "x-mcp-header": "Run-Id"
+      }
+    },
+    "required": [
+      "runId",
+      "enemyId"
+    ],
+    "type": "object"
+  },
+  "name": "spawn_enemy",
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "auditId": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "boolean"
+      },
+      "data": {},
+      "dryRun": {
+        "type": "boolean"
+      },
+      "risk": {
+        "type": "string"
+      },
+      "runId": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "tool",
+      "runId",
+      "changed",
+      "summary"
+    ],
+    "type": "object"
+  },
+  "title": "Spawn Enemy"
+}
