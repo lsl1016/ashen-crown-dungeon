@@ -33,7 +33,7 @@
         <button id="openSavesBtn" class="btn ghost large">读取存档</button>
         <button id="worldBtn" class="btn ghost large">世界档案</button>
       </div>
-      <p class="start-tip">V0.5 · 不接 AI。新增角色/怪物立绘、多帧动作、NPC 对话树、关系值、商店买卖、任务选择、属性/精通成长与多层环境表现。</p>
+      <p class="start-tip">V0.6 · 不接 AI。世界会持续变化：NPC 迁移、区域状态、任务结局、商店补货、装备词条，以及近 / 中 / 远三档战术站位。</p>
     </section>
   </div>
 
@@ -83,6 +83,7 @@
 
           <div class="scene-status">
             <span id="zoneLabel">外墓区</span>
+            <span id="regionStateLabel" class="region-state-label">灰雾封锁</span>
             <span id="interactionCounter">0 个可调查目标</span>
           </div>
 
@@ -121,6 +122,7 @@
             <img id="enemyPortrait" class="enemy-portrait" src="/assets/portraits/enemy_skeleton.svg" alt="敌人立绘" />
             <div class="enemy-info">
               <div class="enemy-title-row"><b id="enemyName">骨骸仆从</b><span id="enemyArchetype"></span></div>
+              <div id="combatDistance" class="combat-distance"><i></i><i></i><i></i><b>中距</b></div>
               <p id="enemyDescription"></p>
               <div class="enemy-bar"><i id="enemyHpBar"></i></div><small id="enemyHpText"></small>
               <div id="enemyStatuses" class="status-row"></div>

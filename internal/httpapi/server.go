@@ -43,6 +43,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/runs/{id}/talent", s.talent)
 	s.mux.HandleFunc("POST /api/runs/{id}/interact", s.interact)
 	s.mux.HandleFunc("POST /api/runs/{id}/dialogue", s.dialogue)
+	s.mux.HandleFunc("POST /api/runs/{id}/npc", s.npc)
 	s.mux.HandleFunc("POST /api/runs/{id}/shop", s.shop)
 	s.mux.HandleFunc("POST /api/runs/{id}/growth", s.growth)
 	s.mux.HandleFunc("POST /api/runs/{id}/save", s.manualSave)
@@ -146,6 +147,18 @@ func (s *Server) interact(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) npc(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			NPCID string `json:"npcId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		return s.engine.StartDialogue(run, in.NPCID)
+	})
+}
+
 func (s *Server) dialogue(w http.ResponseWriter, r *http.Request) {
 	s.mutate(w, r, func(run *game.Run) error {
 		var in struct {
@@ -206,6 +219,7 @@ func (s *Server) manualSave(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&in)
+	s.engine.Prepare(run)
 	meta, err := s.store.ManualSave(run, in.Name)
 	if err != nil {
 		errOut(w, 500, err.Error())
@@ -228,6 +242,7 @@ func (s *Server) loadSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	run.ID = fmt.Sprintf("run_loaded_%d", time.Now().UnixNano())
+	s.engine.Prepare(run)
 	_ = s.store.SaveRun(run)
 	jsonOut(w, 200, s.snapshot(run))
 }
@@ -250,10 +265,12 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request, fn func(*game.Ru
 		errOut(w, 404, "冒险不存在")
 		return
 	}
+	s.engine.Prepare(run)
 	if err := fn(run); err != nil {
 		errOut(w, 400, err.Error())
 		return
 	}
+	s.engine.Prepare(run)
 	if err := s.store.SaveRun(run); err != nil {
 		errOut(w, 500, err.Error())
 		return
@@ -261,6 +278,7 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request, fn func(*game.Ru
 	jsonOut(w, 200, s.snapshot(run))
 }
 func (s *Server) snapshot(run *game.Run) map[string]any {
+	s.engine.Prepare(run)
 	return map[string]any{"run": run, "rooms": game.SortedRooms(run), "items": game.Items, "enemies": game.Enemies}
 }
 

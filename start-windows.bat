@@ -1,6 +1,6 @@
 @echo off
 cd /d %~dp0
-echo Starting Ashen Crown V0.5 server...
+echo Starting Ashen Crown V0.6 server...
 start "Ashen Crown Server" /min "dist\ashen-crown-windows-amd64.exe" -web "web" -data "data"
 timeout /t 2 /nobreak >nul
 start "" http://localhost:8080

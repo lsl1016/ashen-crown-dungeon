@@ -36,6 +36,19 @@ func (e *Engine) UnlockTalent(run *Run, talentID string) error {
 	if run.Player.Talents == nil {
 		run.Player.Talents = map[string]int{}
 	}
+	if def.RequiredLevel > 0 && run.Player.Level < def.RequiredLevel {
+		return fmt.Errorf("需要达到 %d 级", def.RequiredLevel)
+	}
+	for _, req := range def.Requires {
+		if run.Player.Talents[req] <= 0 {
+			for _, td := range Talents {
+				if td.ID == req {
+					return fmt.Errorf("需要先学习「%s」", td.Name)
+				}
+			}
+			return errors.New("缺少前置天赋")
+		}
+	}
 	if run.Player.Talents[talentID] >= def.MaxRank {
 		return errors.New("该天赋已经达到最高等级")
 	}
@@ -70,9 +83,11 @@ func (e *Engine) equipItem(run *Run, itemID string) error {
 	}
 	if old, ok := Items[oldID]; ok {
 		e.applyItemBonuses(&run.Player, old, -1)
+		e.applyAffixBonuses(run, oldID, -1)
 	}
 	run.Player.Equipment[item.Slot] = itemID
 	e.applyItemBonuses(&run.Player, item, 1)
+	e.applyAffixBonuses(run, itemID, 1)
 	e.log(run, "item", fmt.Sprintf("已装备%s：「%s」。", slotName(item.Slot), item.Name))
 	return nil
 }
@@ -113,12 +128,10 @@ func (e *Engine) advanceClock(run *Run) {
 		run.Clock.Bell = 1
 	}
 	run.Clock.Steps++
-	if run.Clock.Steps%5 != 0 {
+	if run.Clock.Steps%5 != 0 || run.Clock.Bell >= 13 {
 		return
 	}
-	if run.Clock.Bell < 13 {
-		run.Clock.Bell++
-	}
+	run.Clock.Bell++
 	run.Clock.Threat = max(0, (run.Clock.Bell-1)/3)
 	switch run.Clock.Bell {
 	case 4:
@@ -137,6 +150,7 @@ func (e *Engine) advanceClock(run *Run) {
 		run.Clock.LastChange = fmt.Sprintf("第%d声钟穿过石壁，墓城威胁正在上升。", run.Clock.Bell)
 	}
 	e.log(run, "world", run.Clock.LastChange)
+	e.onBellChanged(run)
 }
 
 func statusStacks(statuses []StatusState, id string) int {
@@ -279,6 +293,9 @@ func (e *Engine) chooseEnemyIntent(run *Run, enemy EnemyDef, combat *CombatState
 			pool = []string{"charge", "multi", "drain", "heavy"}
 		}
 	}
+	if combat.Distance > 1 && (profile == "brute" || profile == "guardian" || profile == "duelist" || profile == "predator") && combat.Round%2 == 0 {
+		return intentDef("advance", enemy)
+	}
 	if len(pool) == 0 {
 		pool = []string{"attack"}
 	}
@@ -288,6 +305,8 @@ func (e *Engine) chooseEnemyIntent(run *Run, enemy EnemyDef, combat *CombatState
 
 func intentDef(id string, enemy EnemyDef) EnemyIntent {
 	switch id {
+	case "advance":
+		return EnemyIntent{ID: id, Kind: "advance", Label: "逼近", Description: "敌人试图缩短站位距离。", Icon: "→", Telegraph: "后撤可以继续保持距离，近战职业也可以迎上去"}
 	case "heavy":
 		return EnemyIntent{ID: id, Kind: "heavy", Label: "蓄力重击", Description: "下一击伤害更高，但动作明显。", Icon: "☄", Power: 4, Telegraph: "适合防御，铁誓守卫可尝试打断"}
 	case "multi":
@@ -312,6 +331,12 @@ func (e *Engine) resolveEnemyIntent(run *Run, enemy EnemyDef, messages *[]string
 	}
 	intent := combat.Intent
 	switch intent.Kind {
+	case "advance":
+		if combat.Distance > 1 {
+			combat.Distance--
+		}
+		*messages = append(*messages, fmt.Sprintf("%s向前逼近，距离变为%s。", enemy.Name, distanceName(combat.Distance)))
+		return
 	case "defend":
 		combat.Counters["enemy_guard"] = 1
 		*messages = append(*messages, enemy.Name+"进入防御架势，下一轮防御 +3。")
@@ -337,6 +362,7 @@ func (e *Engine) resolveEnemyIntent(run *Run, enemy EnemyDef, messages *[]string
 			*messages = append(*messages, fmt.Sprintf("%s从你的记忆中恢复 %d 点生命。", enemy.Name, heal))
 		}
 	case "charge":
+		combat.Distance = 1
 		e.enemyAttackOnce(run, enemy, -2, 6, messages, "王冠黑火")
 	default:
 		e.enemyAttackOnce(run, enemy, 0, 0, messages, "攻击")
@@ -349,9 +375,15 @@ func (e *Engine) enemyAttackOnce(run *Run, enemy EnemyDef, attackMod, damageMod 
 		return -1
 	}
 	attackRoll := e.roll(run, "enemy-"+combat.Intent.Kind+"-"+label, 20) + enemy.Attack + attackMod + run.Clock.Threat/2 - statusStacks(combat.EnemyStatuses, "weakened")*2
+	if combat.Distance == 3 && (enemy.IntentProfile == "brute" || enemy.IntentProfile == "guardian" || enemy.IntentProfile == "duelist" || enemy.IntentProfile == "predator") {
+		attackRoll -= 2
+	}
 	defense := run.Player.Defense
 	if combat.Guarded {
 		defense += 4
+		if e.hasTalent(run, "warden_anchor") && combat.Distance == 1 {
+			defense++
+		}
 		if e.hasTalent(run, "warden_bulwark") {
 			defense += 2
 		}
@@ -365,6 +397,9 @@ func (e *Engine) enemyAttackOnce(run *Run, enemy EnemyDef, attackMod, damageMod 
 	}
 	dmgRange := max(1, enemy.DamageMax-enemy.DamageMin+1)
 	dmg := enemy.DamageMin + e.roll(run, "enemy-damage-"+label, dmgRange) - 1 + damageMod + run.Clock.Threat/2
+	if combat.Distance == 3 && (enemy.IntentProfile == "brute" || enemy.IntentProfile == "guardian" || enemy.IntentProfile == "duelist" || enemy.IntentProfile == "predator") {
+		dmg--
+	}
 	if combat.Guarded {
 		dmg = (dmg + 1) / 2
 	}

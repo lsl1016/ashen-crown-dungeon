@@ -309,6 +309,7 @@ func World() WorldMeta {
 		Shops:     Shops,
 		Dialogues: Dialogues,
 		Growth:    Growth,
-		ToolHint:  "V0.5 保持代码定义能力、数据定义世界。NPC、对话树、商店库存、任务选择和成长全部是持久化 Run 状态；未来 AI 应通过 Game Tool 驱动这些系统，而不是修改源码。",
+		Affixes:   Affixes,
+		ToolHint:  "V0.6 继续保持代码定义能力、数据定义世界。NPC 日程、区域状态、任务后果、商店刷新、站位战斗和装备词条全部进入持久化 Run；未来 AI 只通过 Game Tool 操作这些能力。",
 	}
 }

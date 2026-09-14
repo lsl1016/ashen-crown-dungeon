@@ -342,6 +342,9 @@ func TestV05ShopBuyAndSell(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.Player.Gold = 200
+	r.CurrentRoomID = "room_14"
+	r.Rooms["room_14"].Discovered = true
+	r.Rooms["room_14"].Visited = true
 	if err := e.StartDialogue(r, "veil_broker"); err != nil {
 		t.Fatal(err)
 	}
@@ -412,5 +415,176 @@ func TestV05SignatureMasteryReducesSkillCostAtRankThree(t *testing.T) {
 	}
 	if r.Player.Energy != before-2 {
 		t.Fatalf("rank-three signature mastery should cost 2 energy: got %d from %d", r.Player.Energy, before)
+	}
+}
+
+func TestV06NPCScheduleAndRegionState(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Watcher", "ranger", 6060)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.NPCLocations["iven"]; got != "room_13" {
+		t.Fatalf("Iven should start at patrol camp, got %s", got)
+	}
+	r.Clock.Bell = 7
+	e.onBellChanged(r)
+	if got := r.NPCLocations["iven"]; got != "room_25" {
+		t.Fatalf("Iven should migrate to infirmary at bell 7, got %s", got)
+	}
+	if got := r.RegionStates["外墓区"]; got != "灰雾加深 · 巡夜线失联" {
+		t.Fatalf("unexpected outer cemetery state: %s", got)
+	}
+	r.Flags["lost_patrol_reported"] = true
+	e.syncRegionStates(r)
+	e.syncNPCLocations(r, false)
+	if got := r.NPCLocations["iven"]; got != "room_01" {
+		t.Fatalf("reported patrol should move Iven to entrance, got %s", got)
+	}
+	if got := r.RegionStates["外墓区"]; got != "巡夜团重新建立哨线" {
+		t.Fatalf("reported patrol should stabilize region, got %s", got)
+	}
+}
+
+func TestV06ShopRefreshesAfterThreeBells(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Restocker", "warden", 6061)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "veil_market:healing_draught"
+	base := r.ShopStock[key]
+	if base < 1 {
+		t.Fatal("expected healing draught stock")
+	}
+	r.ShopStock[key] = 0
+	r.ShopRefresh["veil_market"] = 1
+	r.Clock.Bell = 4
+	e.refreshShops(r)
+	if r.ShopStock[key] <= 0 {
+		t.Fatal("merchant should restock consumables after three bells")
+	}
+	if r.ShopRefresh["veil_market"] != 4 {
+		t.Fatal("shop refresh bell should persist")
+	}
+}
+
+func TestV06TalentPrerequisites(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Tree", "warden", 6062)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.Level = 4
+	r.Player.TalentPoints = 4
+	if err := e.UnlockTalent(r, "warden_execution"); err == nil {
+		t.Fatal("tier-two talent should require its prerequisite")
+	}
+	if err := e.UnlockTalent(r, "warden_bulwark"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.UnlockTalent(r, "warden_execution"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.UnlockTalent(r, "warden_march"); err != nil {
+		t.Fatal(err)
+	}
+	if !e.hasTalent(r, "warden_march") {
+		t.Fatal("capstone talent should unlock after prerequisites")
+	}
+}
+
+func TestV06AffixAppliesWhenEquipped(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Affixed", "ranger", 6063)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.Inventory = append(r.Player.Inventory, "graveglass_edge")
+	r.ItemAffixes["graveglass_edge"] = []AffixState{{ID: "keen", Name: "锋锐", Power: 1, Attributes: AttributeSet{Dexterity: 1}}}
+	beforeDex := r.Player.Attributes.Dexterity
+	if err := e.equipItem(r, "graveglass_edge"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.Attributes.Dexterity != beforeDex+1 {
+		t.Fatalf("affix attribute should apply on equip: before=%d after=%d", beforeDex, r.Player.Attributes.Dexterity)
+	}
+	if got := e.weaponPower(r); got < Items["graveglass_edge"].Power+1 {
+		t.Fatalf("weapon affix power should participate in damage power, got %d", got)
+	}
+}
+
+func TestV06CombatDistanceActions(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Spacer", "ranger", 6064)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.HP = 999
+	r.Player.MaxHP = 999
+	e.startCombat(r, "bone_thrall")
+	if r.Combat.Distance != 2 {
+		t.Fatalf("ranger should start at middle distance, got %d", r.Combat.Distance)
+	}
+	// Force a non-melee enemy intent so the enemy cannot immediately undo the retreat.
+	r.Combat.Intent = EnemyIntent{ID: "defend", Kind: "defend", Label: "防御架势"}
+	if err := e.CombatAction(r, "retreat"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Combat == nil || r.Combat.Distance != 3 {
+		t.Fatalf("retreat should reach far distance, got %+v", r.Combat)
+	}
+	r.Combat.Intent = EnemyIntent{ID: "defend", Kind: "defend", Label: "防御架势"}
+	if err := e.CombatAction(r, "advance"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Combat == nil || r.Combat.Distance != 2 {
+		t.Fatalf("advance should return to middle distance, got %+v", r.Combat)
+	}
+}
+
+func TestV06QuestTurnInPersistsOutcomeAndMovesNPC(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Reporter", "ranger", 6065)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Quests["lost_patrol"] = &QuestState{ID: "lost_patrol", Title: "失踪的第三巡夜队", Status: "completed", Stage: "return", Progress: 1, Goal: 1}
+	r.CurrentRoomID = "room_13"
+	if err := e.StartDialogue(r, "iven"); err != nil {
+		t.Fatal(err)
+	}
+	if r.ActiveDialogue == nil || r.ActiveDialogue.NodeID != "return" {
+		t.Fatalf("completed quest should start at return node: %+v", r.ActiveDialogue)
+	}
+	if err := e.DialogueChoice(r, "report"); err != nil {
+		t.Fatal(err)
+	}
+	e.Prepare(r)
+	q := r.Quests["lost_patrol"]
+	if q.Outcome != "reported" || q.Stage != "resolved" {
+		t.Fatalf("quest outcome should persist, got %+v", q)
+	}
+	if r.NPCLocations["iven"] != "room_01" {
+		t.Fatalf("turn-in should move Iven to entrance, got %s", r.NPCLocations["iven"])
+	}
+	if !hasItem(r.Player.Inventory, "patrol_charm") {
+		t.Fatal("turn-in should grant patrol charm")
+	}
+}
+
+func TestV06PrepareNormalizesOldSave(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Legacy", "seer", 6066)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.NPCLocations = nil
+	r.RegionStates = nil
+	r.ShopRefresh = nil
+	r.ItemAffixes = nil
+	e.Prepare(r)
+	if len(r.NPCLocations) == 0 || len(r.RegionStates) == 0 || len(r.ShopRefresh) == 0 || r.ItemAffixes == nil {
+		t.Fatal("Prepare should normalize all V0.6 persistent maps")
 	}
 }

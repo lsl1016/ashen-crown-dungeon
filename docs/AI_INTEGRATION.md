@@ -1,6 +1,6 @@
 # AI / DM Agent 接入预留
 
-V0.5 **仍然没有接入 LLM**。这不是缺项，而是刻意让 Game Runtime 先成为独立、可玩的规则引擎。
+V0.6 **仍然没有接入 LLM**。这不是缺项，而是刻意让 Game Runtime 先成为独立、可玩的规则引擎。
 
 当前已经提供：
 
@@ -74,3 +74,10 @@ AI 可以创造和组合**数据**，但不应该在游戏运行时：
 - `Player.Growth`：长期战斗精通。
 
 未来 Agent 可以读取这些状态，但仍应通过规则层 API / Tool 修改它们。
+
+
+## V0.6 进一步提供给 AI 的世界事实
+
+V0.6 新增的 `npcLocations`、`regionStates`、`quest.stage/outcome`、`shopRefresh`、`itemAffixes` 和 `combat.distance` 都应该进入未来 DM Agent 的只读上下文。
+
+Agent 可以基于这些事实决定“说什么”和“调用什么 Tool”，但不能直接覆写事实。例如 NPC 已迁往灰疫医馆时，模型不能仅靠叙述让他继续站在断桥营火；必须通过未来受控的 NPC/World Tool 改变 Run。

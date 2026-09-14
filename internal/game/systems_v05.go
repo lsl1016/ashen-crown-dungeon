@@ -37,7 +37,7 @@ func (e *Engine) ensureV05State(run *Run) {
 }
 
 func (e *Engine) StartDialogue(run *Run, npcID string) error {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	if run.GameOver {
 		return errors.New("冒险已经结束")
 	}
@@ -51,18 +51,28 @@ func (e *Engine) StartDialogue(run *Run, npcID string) error {
 	if !ok {
 		return errors.New("NPC 不存在")
 	}
+	if loc := run.NPCLocations[npcID]; loc != "" && loc != run.CurrentRoomID {
+		if room := run.Rooms[loc]; room != nil {
+			return fmt.Errorf("%s现在不在这里；最近有人在「%s」见过%s", npc.Name, room.Name, npc.Name)
+		}
+		return errors.New("这个 NPC 现在不在这里")
+	}
 	dlg, ok := Dialogues[npc.DialogueID]
 	if !ok {
 		return errors.New("对话树不存在")
 	}
-	run.ActiveDialogue = &ActiveDialogue{NPCID: npcID, DialogueID: dlg.ID, NodeID: dlg.StartNode}
+	start := e.dialogueStartNode(run, npcID, dlg.StartNode)
+	if _, ok := dlg.Nodes[start]; !ok {
+		start = dlg.StartNode
+	}
+	run.ActiveDialogue = &ActiveDialogue{NPCID: npcID, DialogueID: dlg.ID, NodeID: start}
 	e.log(run, "dialogue", fmt.Sprintf("你与%s交谈。", npc.Name))
 	run.UpdatedAt = time.Now()
 	return nil
 }
 
 func (e *Engine) DialogueChoice(run *Run, choiceID string) error {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	if run.ActiveDialogue == nil {
 		return errors.New("当前没有进行中的对话")
 	}
@@ -129,7 +139,7 @@ func (e *Engine) CloseDialogue(run *Run) error {
 }
 
 func (e *Engine) ShopAction(run *Run, shopID, action, itemID string) error {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	shop, ok := Shops[shopID]
 	if !ok {
 		return errors.New("商店不存在")
@@ -175,6 +185,9 @@ func (e *Engine) ShopAction(run *Run, shopID, action, itemID string) error {
 		}
 		run.Player.Gold -= price
 		run.Player.Inventory = append(run.Player.Inventory, itemID)
+		if item.Slot != "" {
+			e.ensureItemAffix(run, itemID, "shop:"+shopID, item.Rarity == "rare" || item.Rarity == "legendary")
+		}
 		run.ShopStock[key]--
 		e.log(run, "shop", fmt.Sprintf("购买「%s」，花费 %d 枚古金币。", item.Name, price))
 	case "sell":
@@ -205,7 +218,7 @@ func (e *Engine) ShopAction(run *Run, shopID, action, itemID string) error {
 }
 
 func (e *Engine) UpgradeAttribute(run *Run, attribute string) error {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	if run.Combat != nil || run.ActiveEvent != nil || run.ActiveDialogue != nil || run.ActiveShop != "" {
 		return errors.New("当前状态不能分配属性点")
 	}
@@ -246,7 +259,7 @@ func attributeCN(id string) string {
 }
 
 func (e *Engine) UpgradeGrowth(run *Run, growthID string) error {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	if run.Combat != nil || run.ActiveEvent != nil || run.ActiveDialogue != nil || run.ActiveShop != "" {
 		return errors.New("当前状态不能进行精通训练")
 	}
@@ -319,7 +332,7 @@ func relationLabel(v int) string {
 }
 
 func (e *Engine) applyDialogueEffect(run *Run, ef Effect) bool {
-	e.ensureV05State(run)
+	e.ensureV06State(run)
 	switch ef.Type {
 	case "relation":
 		run.NPCRelations[ef.Target] = clamp(run.NPCRelations[ef.Target]+ef.Value, -10, 10)
@@ -344,7 +357,7 @@ func (e *Engine) applyDialogueEffect(run *Run, ef Effect) bool {
 func v05Quest(run *Run, id string) *QuestState {
 	switch id {
 	case "storm_hunt":
-		return &QuestState{ID: id, Title: "支线 · 空钟猎人", Description: "击败一名风暴骑士，带回其胸甲上的空钟纹路情报。", Status: "active", Goal: 1}
+		return &QuestState{ID: id, Title: "支线 · 空钟猎人", Description: "击败一名风暴骑士，带回其胸甲上的空钟纹路情报。", Status: "active", Stage: "hunt_storm_knight", Goal: 1}
 	}
 	return nil
 }

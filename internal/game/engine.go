@@ -45,7 +45,8 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 		Player: player, Rooms: rooms, Edges: edges, CurrentRoomID: "room_01",
 		Flags: map[string]bool{}, Quests: map[string]*QuestState{}, Lore: []LoreEntry{}, Log: []LogEntry{},
 		Clock:        WorldClock{Bell: 1, Steps: 0, Threat: 0, LastChange: "第一声钟已经结束。墓城开始重新排列道路。"},
-		NPCRelations: map[string]int{}, ShopStock: initialShopStock(),
+		NPCRelations: map[string]int{}, NPCLocations: initialNPCLocations(), RegionStates: initialRegionStates(),
+		ShopStock: initialShopStock(), ShopRefresh: initialShopRefresh(1), ItemAffixes: map[string][]AffixState{},
 	}
 	// 每个职业都带一件能展示 V0.3 装备 Build 的起始副装备。
 	switch class.ID {
@@ -59,10 +60,11 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 		run.Player.Inventory = append(run.Player.Inventory, "ashen_charm")
 		_ = e.equipItem(run, "ashen_charm")
 	}
-	run.Quests["ashen_crown"] = &QuestState{ID: "ashen_crown", Title: "主线 · 灰烬王冠", Description: "深入烬冠王庭，决定赫里昂与王冠的命运。", Status: "active", Progress: 0, Goal: 1}
+	run.Quests["ashen_crown"] = &QuestState{ID: "ashen_crown", Title: "主线 · 灰烬王冠", Description: "深入烬冠王庭，决定赫里昂与王冠的命运。", Status: "active", Stage: "reach_throne", Progress: 0, Goal: 1}
 	e.revealNeighbors(run, "room_01")
 	e.log(run, "story", "你进入了沉眠墓城。第一声钟鸣已经结束。场景中的物件、门、机关和道路现在都会真实改变世界状态。")
 	e.log(run, "level", "你拥有 1 点初始天赋点。可以从角色面板选择第一项 Build 能力。")
+	e.ensureV06State(run)
 	return run, nil
 }
 
@@ -178,6 +180,9 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 	}
 	combat := run.Combat
 	enemy := Enemies[combat.EnemyID]
+	if combat.Distance <= 0 {
+		combat.Distance = startingDistance(run.Player.Class)
+	}
 	if combat.Cooldowns == nil {
 		combat.Cooldowns = map[string]int{}
 	}
@@ -208,6 +213,12 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 		if e.growthRank(run, "weapon_training") >= 3 {
 			bonus++
 		}
+		if run.Player.Class == "warden" && combat.Distance > 1 {
+			bonus -= combat.Distance - 1
+		}
+		if run.Player.Class == "ranger" && combat.Distance == 3 && e.hasTalent(run, "ranger_longshot") {
+			bonus++
+		}
 		critAt := 20
 		if e.hasTalent(run, "ranger_predator") {
 			critAt = 19
@@ -218,6 +229,9 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 		run.LastRoll = &RollResult{Kind: "attack", Label: "普通攻击", Roll: roll, Bonus: bonus, Total: total, DC: enemyDefense, Success: success, Critical: critical}
 		if success {
 			dmg := 2 + bonus + e.roll(run, "player-damage", 6) + e.weaponPower(run) + e.growthRank(run, "weapon_training")
+			if run.Player.Class == "ranger" && combat.Distance == 3 && e.hasTalent(run, "ranger_longshot") {
+				dmg += 3
+			}
 			if critical {
 				dmg += 4 + e.weaponPower(run)
 				messages = append(messages, "暴击！")
@@ -283,6 +297,9 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 			if run.Player.Equipment["weapon"] == "scribe_wand" {
 				baseDamage += 2
 			}
+			if combat.Distance == 3 && e.hasTalent(run, "seer_overchannel") {
+				baseDamage += 4
+			}
 			skillName = "余烬爆裂"
 		}
 		baseDamage += masteryBonus
@@ -320,7 +337,40 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 	case "guard":
 		combat.Guarded = true
 		run.Player.Energy = clamp(run.Player.Energy+1, 0, run.Player.MaxEnergy)
+		if e.hasTalent(run, "warden_anchor") {
+			run.Player.HP = clamp(run.Player.HP+2, 0, run.Player.MaxHP)
+			messages = append(messages, "不动锚誓稳住阵线，你恢复 2 点生命。")
+		}
 		messages = append(messages, "你收紧架势，本轮防御提升并恢复 1 点能量。")
+	case "advance":
+		if combat.Distance <= 1 {
+			return errors.New("已经处于近距")
+		}
+		combat.Distance--
+		if e.hasTalent(run, "warden_march") {
+			combat.Guarded = true
+			run.Player.Energy = clamp(run.Player.Energy+1, 0, run.Player.MaxEnergy)
+			messages = append(messages, "铁墙推进：你在推进时保持防御姿态并恢复 1 点能量。")
+		}
+		messages = append(messages, fmt.Sprintf("你向前压进到%s。", distanceName(combat.Distance)))
+	case "retreat":
+		if combat.Distance >= 3 {
+			return errors.New("已经处于远距")
+		}
+		combat.Distance++
+		if run.Player.Class == "ranger" && e.hasTalent(run, "ranger_ghostwalk") {
+			combat.Guarded = true
+			if combat.Distance == 3 {
+				run.Player.Energy = clamp(run.Player.Energy+1, 0, run.Player.MaxEnergy)
+			}
+			messages = append(messages, "无痕撤步让你在移动中保持防御。")
+		}
+		if run.Player.Class == "seer" && e.hasTalent(run, "seer_echo_step") {
+			run.Player.Energy = clamp(run.Player.Energy+2, 0, run.Player.MaxEnergy)
+			combat.Counters["seer_ward"] = 1
+			messages = append(messages, "残响移步恢复 2 点能量，并重新展开符文护幕。")
+		}
+		messages = append(messages, fmt.Sprintf("你拉开距离到%s。", distanceName(combat.Distance)))
 	case "potion":
 		if !removeItem(&run.Player, "healing_draught") {
 			return errors.New("背包里没有红叶药剂")
@@ -620,7 +670,7 @@ func (e *Engine) startCombat(run *Run, enemyID string) {
 		hpBonus = run.Clock.Threat * 3
 	}
 	combat := &CombatState{
-		EnemyID: enemy.ID, EnemyName: enemy.Name, EnemyHP: enemy.HP + hpBonus, EnemyMaxHP: enemy.HP + hpBonus,
+		EnemyID: enemy.ID, Distance: startingDistance(run.Player.Class), EnemyName: enemy.Name, EnemyHP: enemy.HP + hpBonus, EnemyMaxHP: enemy.HP + hpBonus,
 		EnemyDefense: enemy.Defense + run.Clock.Threat/3, Round: 0, LastMessage: enemy.Description,
 		BossPhase: 1, Cooldowns: map[string]int{}, Counters: map[string]int{},
 	}
@@ -632,7 +682,7 @@ func (e *Engine) startCombat(run *Run, enemyID string) {
 	}
 	combat.Intent = e.chooseEnemyIntent(run, enemy, combat)
 	run.Combat = combat
-	e.log(run, "combat", fmt.Sprintf("%s出现了。%s 敌人意图：%s。", enemy.Name, enemy.Description, combat.Intent.Label))
+	e.log(run, "combat", fmt.Sprintf("%s出现了。%s 初始站位：%s；敌人意图：%s。", enemy.Name, enemy.Description, distanceName(combat.Distance), combat.Intent.Label))
 }
 
 func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
@@ -653,6 +703,7 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 			q.Progress = min(q.Goal, q.Progress+1)
 			if q.Progress >= q.Goal {
 				q.Status = "completed"
+				q.Stage = "return"
 				run.Player.Gold += 28
 				run.Player.XP += 18
 				run.Flags["storm_hunt_complete"] = true
@@ -673,6 +724,24 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 			run.Player.Inventory = append(run.Player.Inventory, itemID)
 			msg += " 敌人还掉落了「" + Items[itemID].Name + "」。"
 		}
+
+		gearChance := 14
+		if enemy.Archetype == "精英" || enemy.Archetype == "构装" || enemy.ID == "storm_knight" {
+			gearChance = 26
+		}
+		if e.hasTalent(run, "ranger_scavenger") {
+			gearChance += 8
+		}
+		if e.roll(run, "gear-drop", 100) <= gearChance {
+			gearPool := []string{"graveglass_edge", "echo_mail", "star_lens"}
+			itemID := gearPool[int(hash64(fmt.Sprintf("gear:%d:%s:%d", run.Seed, enemy.ID, run.Turn))%uint64(len(gearPool)))]
+			e.grantAffixedLoot(run, itemID, enemy.ID, true)
+			if aff := run.ItemAffixes[itemID]; len(aff) > 0 {
+				msg += " 你还找到一件带词条的装备：「" + aff[0].Name + " · " + Items[itemID].Name + "」。"
+			} else {
+				msg += " 你还找到装备：「" + Items[itemID].Name + "」。"
+			}
+		}
 	}
 
 	if enemy.Boss {
@@ -681,15 +750,19 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 			if q := run.Quests["ashen_crown"]; q != nil {
 				q.Progress = 1
 				q.Status = "completed"
+				q.Stage = "resolved"
+				q.Outcome = "crown_broken"
 			}
 			if room := run.Rooms["room_33"]; room != nil {
 				room.Locked = false
 				room.Discovered = true
 			}
 			if run.Quests["beyond_mist"] == nil {
-				run.Quests["beyond_mist"] = &QuestState{ID: "beyond_mist", Title: "第二幕 · 雾外荒原", Description: "赫里昂倒下后，王座后的石门打开。沿灰风向东，找到真正被王冠压住的那扇门。", Status: "active", Goal: 1}
+				run.Quests["beyond_mist"] = &QuestState{ID: "beyond_mist", Title: "第二幕 · 雾外荒原", Description: "赫里昂倒下后，王座后的石门打开。沿灰风向东，找到真正被王冠压住的那扇门。", Status: "active", Stage: "find_outer_gate", Goal: 1}
 			}
 			run.Flags["act2_unlocked"] = true
+			e.syncRegionStates(run)
+			e.syncNPCLocations(run, true)
 			msg += " 赫里昂没有化成灰。他把最后一道王冠锁链扯断，王座后的石墙随之裂开。冷风第一次从墓城之外吹入——真正的封印还在雾外荒原。第二幕已经开启。"
 			e.log(run, "act", "第二幕开启：雾外荒原。地图东侧出现一条通往地表的道路。")
 		} else if enemy.ID == "gate_heart" {
@@ -697,6 +770,8 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 			if q := run.Quests["beyond_mist"]; q != nil {
 				q.Progress = 1
 				q.Status = "completed"
+				q.Stage = "resolved"
+				q.Outcome = "gate_heart_silenced"
 			}
 			run.Victory = true
 			run.GameOver = true
@@ -709,6 +784,7 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 			msg += " " + ending
 		}
 	}
+	e.syncRegionStates(run)
 	run.Combat = nil
 	e.log(run, "combat", msg)
 	e.levelUp(run)
@@ -758,16 +834,26 @@ func (e *Engine) applyEffects(run *Run, effects []Effect) {
 				}
 				switch ef.Target {
 				case "lost_patrol":
-					run.Quests[ef.Target] = &QuestState{ID: ef.Target, Title: "支线 · 失踪巡夜队", Description: "寻找伊文失踪的队长，并查明巡夜队在王庭门前遭遇了什么。", Status: "active", Goal: 1}
+					run.Quests[ef.Target] = &QuestState{ID: ef.Target, Title: "支线 · 失踪巡夜队", Description: "寻找伊文失踪的队长，并查明巡夜队在王庭门前遭遇了什么。", Status: "active", Stage: "find_captain", Goal: 1}
 				case "nameless_prisoner":
-					run.Quests[ef.Target] = &QuestState{ID: ef.Target, Title: "支线 · 被抹去的名字", Description: "寻找能够恢复囚徒姓名的王族记录。王名密室也许保存着答案。", Status: "active", Goal: 1}
+					run.Quests[ef.Target] = &QuestState{ID: ef.Target, Title: "支线 · 被抹去的名字", Description: "寻找能够恢复囚徒姓名的王族记录。王名密室也许保存着答案。", Status: "active", Stage: "recover_name", Goal: 1}
 				}
 			}
 		case "quest_complete":
 			if q := run.Quests[ef.Target]; q != nil {
 				q.Status = "completed"
+				q.Stage = "return"
 				q.Progress = q.Goal
 			}
+		case "quest_stage":
+			if q := run.Quests[ef.Target]; q != nil {
+				q.Stage = ef.Text
+			}
+		case "quest_outcome":
+			e.setQuestOutcome(run, ef.Target, ef.Text)
+		case "region_state":
+			e.ensureV06State(run)
+			run.RegionStates[ef.Target] = ef.Text
 		case "lore":
 			if entry, ok := Lore[ef.Target]; ok {
 				e.addLore(run, entry)
@@ -851,7 +937,7 @@ func (e *Engine) weaponPower(run *Run) int {
 	if run.Player.Equipment != nil {
 		if id := run.Player.Equipment["weapon"]; id != "" {
 			if item, ok := Items[id]; ok && item.Type == "weapon" && hasItem(run.Player.Inventory, id) {
-				return item.Power
+				return item.Power + e.affixPower(run, id)
 			}
 		}
 	}
