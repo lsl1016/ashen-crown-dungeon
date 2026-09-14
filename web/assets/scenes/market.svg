@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#090b0e"/><stop offset=".56" stop-color="#15130f"/><stop offset="1" stop-color="#050608"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#b49a6a" stop-opacity=".35"/><stop offset="1" stop-color="#b49a6a" stop-opacity="0"/></radialGradient>
+ <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#242529"/><stop offset="1" stop-color="#090a0c"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<ellipse cx="800" cy="470" rx="650" ry="330" fill="url(#glow)"/>
+<path d="M0 680 L800 545 L1600 680 L1600 900 L0 900 Z" fill="url(#floor)" opacity=".9"/>
+<g stroke="#5c5a54" stroke-opacity=".28" fill="none" stroke-width="3">
+ <path d="M0 680 L800 545 L1600 680"/><path d="M150 900 L800 545 L1450 900"/><path d="M430 900 L800 545 L1170 900"/>
+</g>
+<g fill="#171619" stroke="#625b50"><path d="M260 650 V380 H590 V650"/><path d="M1010 650 V360 H1340 V650"/></g><path d="M220 410 h410 l-70 -100H290z" fill="#282126"/><path d="M970 390 h410 l-65 -95h-280z" fill="#202326"/><g fill="#9a8356" opacity=".6"><circle cx="420" cy="540" r="8"/><circle cx="1140" cy="520" r="8"/></g>
+<g opacity=".24" filter="url(#blur)"><ellipse cx="280" cy="710" rx="280" ry="55" fill="#ccd6ce"/><ellipse cx="1280" cy="740" rx="320" ry="65" fill="#ccd6ce"/></g>
+<text x="70" y="90" fill="#bdb29b" opacity=".23" font-size="30" font-family="serif" letter-spacing="10">FACELESS MARKET</text>
+</svg>

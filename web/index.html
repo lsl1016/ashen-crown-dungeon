@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0c10" />
+  <title>灰烬王冠：沉眠墓城</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <div id="startScreen" class="start-screen">
+    <div class="start-fog fog-a"></div><div class="start-fog fog-b"></div><div class="start-grain"></div>
+    <section class="start-card">
+      <div class="crest">♛</div>
+      <p class="eyebrow">ASHEN CROWN · TOMB OF VEYR</p>
+      <h1>灰烬王冠</h1>
+      <h2>沉眠墓城</h2>
+      <p id="worldPremise" class="premise">正在读取墓城记录……</p>
+
+      <div class="feature-strip">
+        <span><b>32</b> 地点</span><i></i><span><b>条件式</b> 场景交互</span><i></i><span><b>12</b> 职业天赋</span><i></i><span><b>意图制</b> 战斗</span>
+      </div>
+
+      <div class="start-form">
+        <label>旅者之名<input id="playerName" maxlength="16" value="洛恩" /></label>
+        <label>世界 Seed<div class="seed-input"><input id="seedInput" type="number" placeholder="留空则随机" /><button id="randomSeedBtn" type="button" title="随机 Seed">↻</button></div></label>
+      </div>
+      <div id="classCards" class="class-cards"></div>
+      <div class="start-actions">
+        <button id="newGameBtn" class="btn primary large">进入墓城</button>
+        <button id="openSavesBtn" class="btn ghost large">读取存档</button>
+        <button id="worldBtn" class="btn ghost large">世界档案</button>
+      </div>
+      <p class="start-tip">V0.3 · 不接 AI。加入敌人意图、Boss 多阶段、天赋 Build、三槽装备、条件机关、世界钟声与 32 地点持续世界。</p>
+    </section>
+  </div>
+
+  <main id="gameShell" class="game-shell hidden">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">♛</span><div><strong>灰烬王冠</strong><small>沉眠墓城 · 第十三钟前夜</small></div></div>
+      <div class="top-center"><span id="roomBreadcrumb">外墓区 / 入口</span><span class="seed-chip">BELL <b id="bellLabel">I / XIII</b></span><span class="seed-chip">SEED <b id="seedLabel">-</b></span></div>
+      <div class="top-actions">
+        <button id="talentBtn" class="icon-btn text-btn talent-top" title="职业天赋">天赋 <b id="talentPointBadge">1</b></button>
+        <button id="codexBtn" class="icon-btn text-btn" title="发现档案">档案</button>
+        <button id="journalBtn" class="icon-btn text-btn" title="冒险日志">日志</button>
+        <button id="saveBtn" class="icon-btn" title="手动存档">▣</button>
+        <button id="menuBtn" class="icon-btn" title="返回标题">⚙</button>
+      </div>
+    </header>
+
+    <section class="layout">
+      <aside class="left-panel panel">
+        <div class="portrait-wrap"><div id="classIcon" class="portrait">🛡️</div><span id="levelBadge" class="level-badge">Lv.1</span></div>
+        <h3 id="playerNameLabel">旅者</h3><p id="classNameLabel" class="muted">铁誓守卫</p>
+
+        <div class="bars">
+          <div class="bar-row"><span>生命</span><b id="hpText">0 / 0</b></div><div class="bar"><i id="hpBar"></i></div>
+          <div class="bar-row"><span>能量</span><b id="energyText">0 / 0</b></div><div class="bar energy"><i id="energyBar"></i></div>
+          <div class="bar-row"><span>经验</span><b id="xpText">0 / 40</b></div><div class="bar xp"><i id="xpBar"></i></div>
+        </div>
+
+        <div class="stats" id="statsGrid"></div>
+        <div class="currency"><span>古金币</span><b>◈ <span id="goldLabel">0</span></b></div>
+
+        <div class="section-title"><span>当前装备</span><small>BUILD</small></div>
+        <div id="equipmentCard" class="equipment-card equipment-grid"></div>
+
+        <div class="section-title"><span>随身物品</span><small id="inventoryCount">0</small></div>
+        <div id="inventoryList" class="inventory-list"></div>
+      </aside>
+
+      <section class="center-stage">
+        <div id="scene" class="scene scene-hall">
+          <div class="scene-light"></div>
+          <div class="scene-vignette"></div><div class="mist mist-1"></div><div class="mist mist-2"></div>
+          <div class="dust dust-a"></div><div class="dust dust-b"></div>
+
+          <div class="scene-status">
+            <span id="zoneLabel">外墓区</span>
+            <span id="interactionCounter">0 个可调查目标</span>
+          </div>
+
+          <div id="hotspotLayer" class="hotspot-layer"></div>
+
+          <div class="scene-caption">
+            <span id="roomTypeLabel" class="room-type">遗迹</span>
+            <h2 id="roomTitle">断碑入口</h2>
+            <p id="roomDescription"></p>
+          </div>
+
+          <div id="eventCard" class="event-card hidden">
+            <span class="event-kicker">SCENE EVENT</span>
+            <h3 id="eventTitle"></h3>
+            <p id="eventDescription"></p>
+          </div>
+
+          <div id="enemyStage" class="enemy-stage hidden">
+            <div class="enemy-aura"></div>
+            <div id="bossPhase" class="boss-phase hidden">PHASE I</div>
+            <div id="enemyIcon" class="enemy-icon">💀</div>
+            <div class="enemy-info">
+              <div class="enemy-title-row"><b id="enemyName">骨骸仆从</b><span id="enemyArchetype"></span></div>
+              <p id="enemyDescription"></p>
+              <div class="enemy-bar"><i id="enemyHpBar"></i></div><small id="enemyHpText"></small>
+              <div id="enemyStatuses" class="status-row"></div>
+            </div>
+            <div id="intentCard" class="intent-card"><span id="intentIcon">⚔</span><div><small>NEXT INTENT</small><b id="intentLabel">试探攻击</b><p id="intentDescription"></p></div></div>
+          </div>
+
+          <div id="diceOverlay" class="dice-overlay hidden">
+            <div class="dice-result" id="diceResultLabel">检定</div>
+            <div class="d20"><span id="diceValue">20</span></div>
+            <p id="diceText">命运正在转动……</p>
+          </div>
+        </div>
+
+        <div class="narrative panel">
+          <div class="narrative-head"><span>冒险记录</span><span id="turnLabel">TURN 1</span></div>
+          <div id="storyFeed" class="story-feed"></div>
+          <div id="contextBar" class="context-bar"></div>
+          <div id="actionArea" class="action-area"></div>
+        </div>
+      </section>
+
+      <aside class="right-panel panel">
+        <div class="section-title"><span>墓城地图</span><small id="mapProgress">0 / 24</small></div>
+        <div id="mapCanvas" class="map-canvas"><svg id="mapSvg" viewBox="-35 -30 900 610" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <p class="map-help"><b>亮金节点</b>是当前位置，带脉冲外圈的节点可直接前往。锁形节点需要场景机关、钥匙或线索才能开启。</p>
+
+        <div id="worldPulse" class="world-pulse"><span>墓城异动</span><b id="worldThreat">威胁 0</b><p id="worldChange">第一声钟已经结束。</p></div>
+
+        <div class="section-title"><span>附近道路</span><small>TRAVEL</small></div>
+        <div id="nearbyList" class="nearby-list"></div>
+
+        <div class="section-title"><span>当前任务</span><small>QUESTS</small></div>
+        <div id="questList" class="quest-list"></div>
+
+        <div class="lore-card"><span>墓城箴言</span><p id="proverbText">“王冠不是王权。它是门闩。”</p></div>
+      </aside>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden"><div class="modal-backdrop"></div><section class="modal-card"><button id="closeModal" class="modal-close">×</button><div id="modalBody"></div></section></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

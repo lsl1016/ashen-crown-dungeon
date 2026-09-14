@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#090b0e"/><stop offset=".56" stop-color="#111317"/><stop offset="1" stop-color="#050608"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#6c737c" stop-opacity=".35"/><stop offset="1" stop-color="#6c737c" stop-opacity="0"/></radialGradient>
+ <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#242529"/><stop offset="1" stop-color="#090a0c"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<ellipse cx="800" cy="470" rx="650" ry="330" fill="url(#glow)"/>
+<path d="M0 680 L800 545 L1600 680 L1600 900 L0 900 Z" fill="url(#floor)" opacity=".9"/>
+<g stroke="#5c5a54" stroke-opacity=".28" fill="none" stroke-width="3">
+ <path d="M0 680 L800 545 L1600 680"/><path d="M150 900 L800 545 L1450 900"/><path d="M430 900 L800 545 L1170 900"/>
+</g>
+<g stroke="#636a72" stroke-width="13" opacity=".8"><path d="M260 220 v440M350 220 v440M440 220 v440M1160 220 v440M1250 220 v440M1340 220 v440"/></g><g stroke="#4a4f56" stroke-width="8"><path d="M220 300 h260M220 580 h260M1120 300 h260M1120 580 h260"/></g><path d="M720 655 q80 -190 160 0" fill="#090a0c" stroke="#4a4d51"/>
+<g opacity=".24" filter="url(#blur)"><ellipse cx="280" cy="710" rx="280" ry="55" fill="#ccd6ce"/><ellipse cx="1280" cy="740" rx="320" ry="65" fill="#ccd6ce"/></g>
+<text x="70" y="90" fill="#bdb29b" opacity=".23" font-size="30" font-family="serif" letter-spacing="10">IRON OATH CELLS</text>
+</svg>

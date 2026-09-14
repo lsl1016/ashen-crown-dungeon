@@ -1,0 +1,10 @@
+{
+  "name": "create_room",
+  "args": {
+    "id": "secret_01",
+    "name": "钟塔后的密室",
+    "type": "event",
+    "x": 8,
+    "y": 1
+  }
+}

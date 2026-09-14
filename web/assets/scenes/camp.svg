@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#090b0e"/><stop offset=".56" stop-color="#10161a"/><stop offset="1" stop-color="#050608"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#728ea2" stop-opacity=".35"/><stop offset="1" stop-color="#728ea2" stop-opacity="0"/></radialGradient>
+ <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#242529"/><stop offset="1" stop-color="#090a0c"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<ellipse cx="800" cy="470" rx="650" ry="330" fill="url(#glow)"/>
+<path d="M0 680 L800 545 L1600 680 L1600 900 L0 900 Z" fill="url(#floor)" opacity=".9"/>
+<g stroke="#5c5a54" stroke-opacity=".28" fill="none" stroke-width="3">
+ <path d="M0 680 L800 545 L1600 680"/><path d="M150 900 L800 545 L1450 900"/><path d="M430 900 L800 545 L1170 900"/>
+</g>
+<path d="M310 650 L470 430 L630 650 Z" fill="#181c20" stroke="#61707a"/><path d="M1010 650 L1120 485 L1230 650 Z" fill="#171b1e" stroke="#56656f"/><g><circle cx="790" cy="650" r="80" fill="#5e4028" opacity=".35"/><path d="M760 665 q40 -150 80 0 q-35 -20 -80 0" fill="#9ab8c7" opacity=".7"/></g>
+<g opacity=".24" filter="url(#blur)"><ellipse cx="280" cy="710" rx="280" ry="55" fill="#ccd6ce"/><ellipse cx="1280" cy="740" rx="320" ry="65" fill="#ccd6ce"/></g>
+<text x="70" y="90" fill="#bdb29b" opacity=".23" font-size="30" font-family="serif" letter-spacing="10">NIGHT WATCH CAMP</text>
+</svg>

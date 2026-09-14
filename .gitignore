@@ -1,0 +1,6 @@
+data/runs/*.json
+data/saves/*.json
+!data/runs/.gitkeep
+!data/saves/.gitkeep
+dist/
+.DS_Store

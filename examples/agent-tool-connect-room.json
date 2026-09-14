@@ -1,0 +1,7 @@
+{
+  "name": "connect_rooms",
+  "args": {
+    "from": "room_08",
+    "to": "secret_01"
+  }
+}
