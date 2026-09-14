@@ -1,21 +1,24 @@
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => [...document.querySelectorAll(q)];
-const state = { world:null, snapshot:null, runId:null, selectedClass:'warden', busy:false };
+const state = { world:null, snapshot:null, runId:null, selectedClass:'warden', busy:false, sound:true, audio:null, actorRoom:null };
 
 const roomIcons = {
   entrance:'⌂', combat:'⚔', event:'◈', treasure:'◇', npc:'♟', merchant:'¤', rest:'✦', shrine:'✧', boss:'♛',
   chapel:'✟', library:'▤', flooded:'≋', prison:'▥', garden:'❀', ossuary:'☷', forge:'⚒', observatory:'✺', banquet:'♜', secret:'◉',
-  infirmary:'✚', gatehouse:'▥', aqueduct:'≈', bridge:'⌁', court:'⚖', belltower:'♢', reliquary:'◆', mausoleum:'▰'
+  infirmary:'✚', gatehouse:'▥', aqueduct:'≈', bridge:'⌁', court:'⚖', belltower:'♢', reliquary:'◆', mausoleum:'▰',
+  frontier:'⌂', ashfield:'〰', caravan:'♟', glassmarsh:'◇', crater:'✹', starwatch:'✺', windshrine:'〽', meteor:'✦', ruins:'⚑', windcamp:'♨', outergate:'┃', finalboss:'◉'
 };
 const typeNames = {
   entrance:'墓城入口', combat:'危险区域', event:'遗迹异象', treasure:'陪葬宝藏', npc:'幸存者营地', merchant:'无脸集市', rest:'安全余火', shrine:'禁忌祭坛', boss:'烬冠核心',
   chapel:'悼亡礼拜堂', library:'王庭档案区', flooded:'沉水城区', prison:'旧王囚区', garden:'地下王庭花园', ossuary:'千骨堂', forge:'王庭工坊', observatory:'地下观测台', banquet:'最后宴厅', secret:'隐藏王室区域',
-  infirmary:'灰疫医馆', gatehouse:'折冠门楼', aqueduct:'黑水引渠', bridge:'断月桥', court:'灰烬审判庭', belltower:'无钟之塔', reliquary:'王室封藏间', mausoleum:'白石王陵'
+  infirmary:'灰疫医馆', gatehouse:'折冠门楼', aqueduct:'黑水引渠', bridge:'断月桥', court:'灰烬审判庭', belltower:'无钟之塔', reliquary:'王室封藏间', mausoleum:'白石王陵',
+  frontier:'雾外界碑', ashfield:'灰风平原', caravan:'停滞商队', glassmarsh:'镜砂洼地', crater:'坠星裂谷', starwatch:'反向观测台', windshrine:'无像风祠', meteor:'陨铁采掘场', ruins:'无旗骑士营', windcamp:'逐风营火', outergate:'外封印黑门', finalboss:'门后心室'
 };
 const attrNames = { strength:'力量', dexterity:'敏捷', perception:'感知', will:'意志' };
 const kindNames = { lore:'调查', event:'触发', loot:'搜寻', npc:'对话', object:'操作', secret:'机关', rest:'休整' };
 const slotNames = { weapon:'武器', armor:'护甲', trinket:'饰品' };
 const rarityNames = { common:'普通', uncommon:'精良', rare:'稀有', legendary:'传说' };
+const combatOnlyItems = new Set(['frost_salt','smoke_bomb','ember_flask','storm_phial']);
 
 async function api(url, options={}) {
   const res = await fetch(url, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
@@ -45,6 +48,7 @@ async function init(){
   $('#journalBtn').onclick = openJournal;
   $('#codexBtn').onclick = openCodex;
   $('#talentBtn').onclick = openTalents;
+  $('#soundBtn').onclick = toggleSound;
   $('#menuBtn').onclick = ()=>{ if(confirm('返回标题画面？当前 Run 已自动保存，手动存档需要点击右上角 ▣。')) location.reload(); };
   $('#closeModal').onclick = closeModal;
   $('.modal-backdrop').onclick = closeModal;
@@ -63,7 +67,7 @@ async function createGame(){
     const seedRaw=$('#seedInput').value.trim();
     const seed=seedRaw?Number(seedRaw):Math.floor(Date.now()/1000);
     const snap=await api('/api/runs',{method:'POST',body:JSON.stringify({name,class:state.selectedClass,seed})});
-    startSnapshot(snap); toast('V0.3 世界已建立 · 你有 1 点初始天赋点');
+    startSnapshot(snap); toast('V0.4 世界已建立 · 第一幕：沉眠墓城'); sfx('start');
   }catch(e){toast(e.message)}finally{state.busy=false}
 }
 function startSnapshot(snap){
@@ -105,7 +109,7 @@ function renderInventory(items,p){
     let action='';
     if(it.slot) action=isEquipped?'<span class="item-count">已装备</span>':`<button class="mini-btn" data-item="${id}" data-item-action="equip">装备</button>`;
     else if(it.type==='consumable'){
-      const combatOnly=['frost_salt','smoke_bomb','ember_flask'].includes(id);
+      const combatOnly=combatOnlyItems.has(id);
       const canUse=combatOnly?inCombat:!inCombat;
       if(canUse) action=`<button class="mini-btn" data-item="${id}" data-item-action="use">${combatOnly?'战斗用':'使用'}</button>`;
     }
@@ -124,6 +128,7 @@ function elementState(run,room,el){
 
 function renderScene(room,run){
   const scene=$('#scene'); scene.className=`scene scene-${room.scene} threat-${Math.min(4,run.clock?.threat||0)}`;
+  renderPlayerActor(room,run);
   $('#zoneLabel').textContent=room.zone||'墓城'; $('#roomTypeLabel').textContent=run.activeEvent?run.activeEvent.title:(typeNames[room.type]||room.type);
   $('#roomTitle').textContent=room.name; $('#roomDescription').textContent=run.activeEvent?run.activeEvent.description:room.description;
   const eventCard=$('#eventCard');
@@ -198,26 +203,46 @@ function renderActions(run,room){
   $$('[data-action-interact]').forEach(b=>b.onclick=()=>interact(b.dataset.actionInteract)); $$('[data-move]').forEach(b=>b.onclick=()=>moveTo(b.dataset.move));
 }
 
-async function chooseEvent(id){ await perform(`/api/runs/${state.runId}/action`,{choiceId:id},true,'event'); }
-async function combatAction(action){ await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
-async function itemAction(itemId,action){ await perform(`/api/runs/${state.runId}/item`,{itemId,action},false,'item'); }
-async function interact(elementId){ await perform(`/api/runs/${state.runId}/interact`,{elementId},true,'interact'); }
-async function moveTo(roomId){ const run=state.snapshot.run;if(run.combat||run.activeEvent||run.gameOver||state.busy)return;await perform(`/api/runs/${state.runId}/move`,{roomId},false,'move'); }
+async function chooseEvent(id){ sfx('interact'); await perform(`/api/runs/${state.runId}/action`,{choiceId:id},true,'event'); }
+async function combatAction(action){ if(action==='skill')actorEmote('cast');else if(action==='guard')actorEmote('guard'); sfx(action==='skill'?'skill':action==='guard'?'guard':'attack'); await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
+async function itemAction(itemId,action){ sfx(action==='equip'?'equip':'item'); await perform(`/api/runs/${state.runId}/item`,{itemId,action},false,'item'); }
+async function interact(elementId){
+  const run=state.snapshot.run, room=run.rooms[run.currentRoomId], el=(room.elements||[]).find(x=>x.id===elementId);
+  if(el) await approachElement(el);
+  sfx('interact');
+  await perform(`/api/runs/${state.runId}/interact`,{elementId},true,'interact');
+}
+async function moveTo(roomId){ const run=state.snapshot.run;if(run.combat||run.activeEvent||run.gameOver||state.busy)return;sfx('move');await perform(`/api/runs/${state.runId}/move`,{roomId},false,'move'); }
 
 async function perform(url,payload,showDice,kind){
   if(state.busy)return; state.busy=true;
   try{
-    const old=state.snapshot?.run, oldHP=old?.player?.hp, oldEnemyHP=old?.combat?.enemyHp, oldPhase=old?.combat?.bossPhase;
+    const old=state.snapshot?.run;
+    const oldHP=old?.player?.hp, oldEnergy=old?.player?.energy, oldEnemyHP=old?.combat?.enemyHp, oldPhase=old?.combat?.bossPhase;
+    const oldCombat=old?.combat?{...old.combat}:null, oldRoom=old?.rooms?.[old?.currentRoomId], oldAct2=!!old?.flags?.act2_unlocked;
     const snap=await api(url,{method:'POST',body:JSON.stringify(payload)});
     if(showDice&&snap.run.lastRoll) await diceFlash(snap.run.lastRoll);
     state.snapshot=snap; render();
-    if(oldEnemyHP!=null&&snap.run.combat&&snap.run.combat.enemyHp<oldEnemyHP){pulseClass('#scene','scene-hit',500)}
-    if(oldHP!=null&&snap.run.player.hp<oldHP){pulseClass('#scene','player-hit',420)}
-    if(oldPhase&&snap.run.combat?.bossPhase>oldPhase){pulseClass('#scene','phase-shift',900);toast(`Boss 进入阶段 ${roman(snap.run.combat.bossPhase)}`)}
-    if(kind==='move'){$('#scene').animate([{opacity:.3,filter:'blur(5px)'},{opacity:1,filter:'blur(0)'}],{duration:380,easing:'ease-out'});}
-  }catch(e){toast(e.message)}finally{state.busy=false}
+    const now=snap.run, nowRoom=now.rooms[now.currentRoomId];
+    if(oldEnemyHP!=null){
+      const nextEnemyHP=now.combat?.enemyHp ?? 0, delta=Math.max(0,oldEnemyHP-nextEnemyHP);
+      if(delta>0){pulseClass('#scene','scene-hit',500);spawnFloat('enemy',`-${delta}`,now.lastRoll?.critical?'crit':'damage');spawnVfx(kind==='combat'?'slash':'burst','enemy');sfx(now.lastRoll?.critical?'crit':'hit');}
+    }
+    if(oldHP!=null&&now.player.hp<oldHP){const d=oldHP-now.player.hp;pulseClass('#scene','screen-shake',360);actorEmote('hit');spawnFloat('player',`-${d}`,'damage');sfx('hurt');}
+    if(oldHP!=null&&now.player.hp>oldHP){spawnFloat('player',`+${now.player.hp-oldHP}`,'heal');sfx('heal');}
+    if(oldEnergy!=null&&now.player.energy>oldEnergy&&kind!=='move'){spawnFloat('player',`+${now.player.energy-oldEnergy} EN`,'energy');}
+    if(!oldCombat&&now.combat){pulseClass('#scene','combat-start',520);if(state.snapshot.enemies[now.combat.enemyId]?.boss){await showCinematic(now.combat.enemyId==='gate_heart'?'FINAL ENCOUNTER':'BOSS ENCOUNTER',now.combat.enemyName,state.snapshot.enemies[now.combat.enemyId]?.description||'', 'boss',1100);sfx('boss');}}
+    if(oldPhase&&now.combat?.bossPhase>oldPhase){pulseClass('#scene','phase-shift',900);await showCinematic(`PHASE ${roman(now.combat.bossPhase)}`,now.combat.enemyName,'敌人的战斗模式发生了变化。','boss',850);sfx('phase');}
+    if(!oldAct2&&now.flags.act2_unlocked){pulseClass('#scene','region-shift',850);await showCinematic('ACT II','雾外荒原','赫里昂倒下后，墓城背后的石门第一次打开。真正的封印在灰风尽头。','',1500);sfx('act');}
+    if(kind==='move'){
+      $('#scene').animate([{opacity:.32,filter:'blur(6px)'},{opacity:1,filter:'blur(0)'}],{duration:430,easing:'ease-out'});
+      if(oldRoom&&nowRoom&&oldRoom.zone!==nowRoom.zone){showCinematic('REGION',nowRoom.zone,nowRoom.description,'',900);}
+    }
+    if(!old?.victory&&now.victory){pulseClass('#scene','final-pulse',1200);await showCinematic('THE END','封印重新闭合','灰风越过荒原。维尔的名字重新回到世界。','final',1800);sfx('victory');}
+  }catch(e){toast(e.message);sfx('error')}finally{state.busy=false}
 }
 function pulseClass(sel,cl,ms){const el=$(sel);if(!el)return;el.classList.add(cl);setTimeout(()=>el.classList.remove(cl),ms)}
+
 async function diceFlash(result){
   const o=$('#diceOverlay'); o.classList.remove('hidden','fail','critical'); if(!result.success)o.classList.add('fail');if(result.critical)o.classList.add('critical');
   $('#diceResultLabel').textContent=result.label||'检定';$('#diceValue').textContent='?';$('#diceText').textContent='命运正在转动……';
@@ -228,10 +253,12 @@ async function diceFlash(result){
 
 function renderMap(run){
   const svg=$('#mapSvg'),rooms=Object.values(run.rooms),sx=92,sy=102,ox=30,oy=52;let html='';const adj=new Set(adjacentRooms(run).map(r=>r.id));
+  const maxX=Math.max(...rooms.map(r=>r.x||0)); svg.setAttribute('viewBox',`-35 -30 ${Math.max(900,ox+maxX*sx+120)} 610`);
+  const dividerX=ox+9.2*sx; html+=`<line class="map-region-divider" x1="${dividerX}" y1="10" x2="${dividerX}" y2="555"/><text class="map-region-label" x="55" y="22">ACT I · 沉眠墓城</text><text class="map-region-label act2" x="${dividerX+30}" y="22">ACT II · 雾外荒原</text>`;
   for(const e of run.edges){const a=run.rooms[e.from],b=run.rooms[e.to];if(!a||!b)continue;const visible=a.discovered&&b.discovered&&!a.locked&&!b.locked;html+=`<line class="map-edge ${visible?'':'hidden-edge'}" x1="${ox+a.x*sx}" y1="${oy+a.y*sy}" x2="${ox+b.x*sx}" y2="${oy+b.y*sy}"/>`;}
   for(const r of rooms){
     const x=ox+r.x*sx,y=oy+r.y*sy,unknown=!r.discovered,reachable=adj.has(r.id)&&r.discovered&&!r.locked&&!run.combat&&!run.activeEvent&&!run.gameOver;
-    const cl=['map-node',unknown?'unknown':'discovered',r.id===run.currentRoomId?'current':'',r.resolved?'resolved':'',reachable?'reachable':'',r.locked&&r.discovered?'locked':''].join(' ');
+    const act2=(r.x||0)>=10;const cl=['map-node',unknown?'unknown':'discovered',r.id===run.currentRoomId?'current':'',r.resolved?'resolved':'',reachable?'reachable':'',r.locked&&r.discovered?'locked':'',act2?'act2':''].join(' ');
     const icon=unknown?'?':r.locked?'⌧':(roomIcons[r.type]||'•'),label=unknown?'未发现':(r.visited?r.name:(typeNames[r.type]||'未知地点'));
     html+=`<g class="${cl}" ${reachable?`data-map-move="${r.id}"`:''} transform="translate(${x},${y})"><circle r="20"></circle><text y="-1">${icon}</text><text class="node-label" y="32">${escapeHtml(label.length>8?label.slice(0,8)+'…':label)}</text></g>`;
   }
@@ -249,7 +276,7 @@ function renderWorldPulse(run){
   const c=run.clock||{bell:1,threat:0,lastChange:'第一声钟已经结束。'};$('#worldThreat').textContent=`威胁 ${c.threat||0} · 第 ${c.bell||1} 钟`;$('#worldChange').textContent=c.lastChange||'墓城暂时保持沉默。';
 }
 function renderProverb(run){
-  let t='“王冠不是王权。它是门闩。”';if(run.flags.knows_last_price)t='“第十三种代价不是死亡，而是遗忘为何不肯死。”';else if(run.flags.heard_true_name)t='“真名不会打开门。真名会让守门的人醒来。”';else if(run.flags.saw_false_crown)t='“你看见的王冠，只是封印希望你看见的形状。”';$('#proverbText').textContent=t;
+  let t='“王冠不是王权。它是门闩。”';if(run.flags.opened_outer_gate)t='“门不是为了阻止我们出去，而是阻止它进来。”';else if(run.flags.act2_unlocked)t='“墓城只是一枚钉子。灰风之外，还有真正的门。”';else if(run.flags.knows_last_price)t='“第十三种代价不是死亡，而是遗忘为何不肯死。”';else if(run.flags.heard_true_name)t='“真名不会打开门。真名会让守门的人醒来。”';else if(run.flags.saw_false_crown)t='“你看见的王冠，只是封印希望你看见的形状。”';$('#proverbText').textContent=t;
 }
 
 async function saveGame(){if(!state.runId)return;try{const run=state.snapshot.run;const meta=await api(`/api/runs/${state.runId}/save`,{method:'POST',body:JSON.stringify({name:`${run.player.name} · ${run.rooms[run.currentRoomId].name}`})});toast(`已保存：${meta.name}`)}catch(e){toast(e.message)}}
@@ -258,7 +285,7 @@ async function openSaves(){
 }
 function openJournal(){if(!state.snapshot)return;const run=state.snapshot.run;showModal(`<h2>冒险日志</h2><div class="log-list">${run.log.slice().reverse().map(l=>`<div><b>#${l.turn}</b> <span style="color:#777">[${escapeHtml(l.type)}]</span> ${escapeHtml(l.message)}</div>`).join('')}</div>`)}
 function openCodex(){if(!state.snapshot)return;const lore=state.snapshot.run.lore||[];showModal(`<h2>发现档案 <small style="font-size:10px;color:#696f76">${lore.length} 条</small></h2><div class="codex-list">${lore.length?lore.map(x=>`<article class="codex-item"><b>${escapeHtml(x.title)}</b><p>${escapeHtml(x.text)}</p></article>`).join(''):'<p class="muted">还没有发现任何档案。调查碑文、病历、判决、笔记与遗物可以解锁。</p>'}</div>`)}
-function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.3 的钟声会随探索推进，威胁等级会影响后续战斗强度。隐藏区域仍需要在世界内找到真正的开启条件。</p></div>`)}
+function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.4 把赫里昂改为第一幕 Boss。击败他会打开雾外荒原，世界地图扩展到 44 个地点；最终结局发生在第二幕黑门之后。</p></div>`)}
 function openTalents(){
   if(!state.snapshot)return;const run=state.snapshot.run,p=run.player,cls=state.world.classes.find(c=>c.id===p.class);const talents=(state.world.talents||[]).filter(t=>t.class===p.class);
   showModal(`<h2>${escapeHtml(cls?.name||'职业')} · 天赋 <small style="font-size:10px;color:#c5a45d">可用 ${p.talentPoints||0} 点</small></h2><div class="talent-grid">${talents.map(t=>{const rank=p.talents?.[t.id]||0,learned=rank>=t.maxRank;return `<article class="talent-card ${learned?'learned':''}"><span class="talent-icon">${t.icon}</span><div><b>${escapeHtml(t.name)}</b><p>${escapeHtml(t.description)}</p><small>${learned?'已学习':`${rank} / ${t.maxRank}`}</small></div>${learned?'':`<button class="mini-btn" data-talent="${t.id}" ${(p.talentPoints||0)<=0?'disabled':''}>学习</button>`}</article>`}).join('')}</div><p class="muted" style="font-size:9px">每次升级获得 1 点天赋点。天赋会直接改变战斗结算，不只是文字说明。</p>`);
@@ -270,5 +297,39 @@ async function learnTalent(id){
 function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
 function handleHotkeys(e){if(e.key==='Escape'&&!$('#modal').classList.contains('hidden')){closeModal();return}if(!state.snapshot||state.busy||!$('#modal').classList.contains('hidden'))return;if(/^[1-9]$/.test(e.key)){const target=document.querySelector(`[data-hotkey="${e.key}"]`);if(target&&!target.disabled){e.preventDefault();target.click()}}}
+
+
+function renderPlayerActor(room,run){
+  const actor=$('#playerActor'), icon=$('#playerActorIcon'); if(!actor||!icon)return;
+  const cls=state.world.classes.find(c=>c.id===run.player.class); icon.textContent=cls?.icon||'◆';
+  if(state.actorRoom!==room.id){state.actorRoom=room.id;setActorPosition(run.combat?18:16,run.combat?74:76,false);}
+  actor.classList.toggle('in-combat',!!run.combat);
+}
+function setActorPosition(x,y,animate=true){const a=$('#playerActor');if(!a)return;if(!animate)a.style.transition='none';a.style.left=`${Math.max(8,Math.min(88,x))}%`;a.style.top=`${Math.max(24,Math.min(82,y))}%`;if(!animate){requestAnimationFrame(()=>a.style.transition='');}}
+async function approachElement(el){
+  const actor=$('#playerActor');if(!actor)return;actor.classList.add('moving');setActorPosition(Math.max(12,Math.min(82,(el.x||50)-8)),Math.max(35,Math.min(78,(el.y||55)+10)),true);await new Promise(r=>setTimeout(r,380));actor.classList.remove('moving');
+}
+function actorEmote(kind){const a=$('#playerActor');if(!a)return;a.classList.remove('cast','hit','guard');void a.offsetWidth;a.classList.add(kind);setTimeout(()=>a.classList.remove(kind),650);}
+function spawnFloat(target,text,kind='damage'){
+  const layer=$('#vfxLayer');if(!layer)return;const el=document.createElement('div');el.className=`float-number ${kind}`;el.textContent=text;
+  if(target==='enemy'){el.style.left='77%';el.style.top='43%';}else{const a=$('#playerActor');el.style.left=a?.style.left||'18%';el.style.top=a?.style.top||'73%';}
+  layer.appendChild(el);setTimeout(()=>el.remove(),1150);
+}
+function spawnVfx(type,target='enemy'){
+  const layer=$('#vfxLayer');if(!layer)return;const el=document.createElement('div');el.className=type==='burst'?'vfx-burst':type==='guard'?'vfx-guard':'vfx-slash';
+  el.style.left=target==='enemy'?'68%':'16%';el.style.top=target==='enemy'?'38%':'58%';layer.appendChild(el);setTimeout(()=>el.remove(),750);
+}
+async function showCinematic(kicker,title,text,kind='',duration=1000){
+  const o=$('#cinematicOverlay');if(!o)return;o.className=`cinematic-overlay show ${kind}`;$('#cinematicKicker').textContent=kicker;$('#cinematicTitle').textContent=title;$('#cinematicText').textContent=text||'';o.classList.remove('hidden');await new Promise(r=>setTimeout(r,duration));o.classList.add('hidden');o.classList.remove('show','boss','final');
+}
+function toggleSound(){state.sound=!state.sound;$('#soundBtn').textContent=`声音 ${state.sound?'ON':'OFF'}`;if(state.sound){ensureAudio();sfx('interact');}}
+function ensureAudio(){
+  if(state.audio)return state.audio;const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return null;state.audio=new Ctx();return state.audio;
+}
+function sfx(kind){
+  if(!state.sound)return;const ctx=ensureAudio();if(!ctx)return;if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+  const presets={attack:[180,95,.07],hit:[90,55,.08],crit:[520,180,.12],hurt:[120,60,.11],skill:[330,760,.16],guard:[240,300,.09],heal:[360,560,.13],item:[420,480,.08],equip:[260,390,.08],move:[100,130,.06],interact:[300,360,.05],boss:[70,42,.28],phase:[190,80,.22],act:[220,440,.24],victory:[330,660,.32],start:[220,330,.18],error:[150,100,.08]};const [a,b,d]=presets[kind]||presets.interact;
+  const now=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type=kind==='boss'||kind==='hurt'?'sawtooth':'sine';o.frequency.setValueAtTime(a,now);o.frequency.exponentialRampToValueAtTime(Math.max(35,b),now+d);g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(kind==='boss'?.07:.035,now+.01);g.gain.exponentialRampToValueAtTime(.0001,now+d);o.connect(g);g.connect(ctx.destination);o.start(now);o.stop(now+d+.02);
+}
 
 init().catch(e=>{console.error(e);toast('初始化失败：'+e.message)});

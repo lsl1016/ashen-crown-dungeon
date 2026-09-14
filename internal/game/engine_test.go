@@ -25,8 +25,8 @@ func TestBasicFlowAndInteraction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Rooms) != 32 {
-		t.Fatalf("want 32 rooms, got %d", len(r.Rooms))
+	if len(r.Rooms) != 44 {
+		t.Fatalf("want 44 rooms, got %d", len(r.Rooms))
 	}
 	if len(r.Rooms["room_01"].Elements) < 2 {
 		t.Fatal("entrance should expose interactive elements")
@@ -224,5 +224,84 @@ func TestCombatConsumableConsumesTurn(t *testing.T) {
 	}
 	if hasItem(run.Player.Inventory, "frost_salt") {
 		t.Fatal("combat consumable should be consumed")
+	}
+}
+
+func TestV04ActTwoStartsLocked(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("ActTester", "warden", 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Rooms) != 44 {
+		t.Fatalf("want 44 rooms in V0.4, got %d", len(r.Rooms))
+	}
+	if room := r.Rooms["room_33"]; room == nil || !room.Locked || room.Discovered {
+		t.Fatal("act two frontier should start locked and undiscovered")
+	}
+	if room := r.Rooms["room_44"]; room == nil || !room.Locked || room.Discovered {
+		t.Fatal("final heart chamber should start locked and undiscovered")
+	}
+}
+
+func TestV04CrownBearerUnlocksActTwoWithoutEndingRun(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("ActTester", "warden", 8181)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.CurrentRoomID = "room_09"
+	e.startCombat(r, "crown_bearer")
+	e.winCombat(r, Enemies["crown_bearer"])
+	if r.GameOver || r.Victory {
+		t.Fatal("first boss must not end V0.4 campaign")
+	}
+	if !r.Flags["act2_unlocked"] {
+		t.Fatal("act two flag should be set")
+	}
+	if room := r.Rooms["room_33"]; room == nil || room.Locked || !room.Discovered {
+		t.Fatal("frontier should unlock after first boss")
+	}
+	if q := r.Quests["beyond_mist"]; q == nil || q.Status != "active" {
+		t.Fatal("act two quest should become active")
+	}
+}
+
+func TestV04FinalBossEndsCampaign(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("FinalTester", "seer", 8282)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.CurrentRoomID = "room_44"
+	e.startCombat(r, "gate_heart")
+	e.winCombat(r, Enemies["gate_heart"])
+	if !r.GameOver || !r.Victory || !r.Flags["defeated_gate_heart"] {
+		t.Fatal("final boss should finish campaign")
+	}
+}
+
+func TestV04OuterGateRequiresCompassAndCanUnlockFinalRoom(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("GateTester", "seer", 8383)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.CurrentRoomID = "room_43"
+	r.Rooms["room_43"].Discovered = true
+	r.Rooms["room_43"].Visited = true
+	if err := e.Interact(r, "outer_gate_line"); err == nil {
+		t.Fatal("outer gate should require the void compass")
+	}
+	r.Player.Inventory = append(r.Player.Inventory, "void_compass")
+	r.Player.Attributes.Will = 100 // make the DC check deterministic for this progression test
+	if err := e.Interact(r, "outer_gate_line"); err != nil {
+		t.Fatal(err)
+	}
+	if room := r.Rooms["room_44"]; room == nil || room.Locked || !room.Discovered {
+		t.Fatal("final heart chamber should unlock after a successful gate check")
+	}
+	if !r.Flags["opened_outer_gate"] {
+		t.Fatal("successful gate interaction should persist its world flag")
 	}
 }

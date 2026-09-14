@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+<defs><radialGradient id="g"><stop stop-color="#5b5365" stop-opacity=".55"/><stop offset="1" stop-color="#141518" stop-opacity="0"/></radialGradient><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#141518"/><stop offset="1" stop-color="#050609"/></linearGradient><filter id="blur"><feGaussianBlur stdDeviation="10"/></filter></defs>
+<rect width="960" height="540" fill="url(#sky)"/><ellipse cx="520" cy="245" rx="360" ry="240" fill="url(#g)"/>
+<g fill="none" stroke="#5b5365" stroke-width="5" opacity=".72">M250 430 L330 230 L410 430 M560 430 L640 250 L730 430 M430 355 Q520 260 610 355</g>
+<g fill="#5b5365" opacity=".28"><circle cx="80" cy="90" r="2"/><circle cx="163" cy="124" r="3"/><circle cx="246" cy="158" r="2"/><circle cx="329" cy="90" r="3"/><circle cx="412" cy="124" r="2"/><circle cx="495" cy="158" r="3"/><circle cx="578" cy="90" r="2"/><circle cx="661" cy="124" r="3"/><circle cx="744" cy="158" r="2"/><circle cx="827" cy="90" r="3"/><circle cx="910" cy="124" r="2"/></g>
+<path d="M0 455 Q150 420 300 462 T610 452 T960 460 V540 H0Z" fill="#060708" opacity=".94"/>
+<g stroke="#d6c8a0" opacity=".12" stroke-width="2"><path d="M0 0 L80 540"/><path d="M120 0 L200 540"/><path d="M240 0 L320 540"/><path d="M360 0 L440 540"/><path d="M480 0 L560 540"/><path d="M600 0 L680 540"/><path d="M720 0 L800 540"/><path d="M840 0 L920 540"/><path d="M960 0 L1040 540"/></g>
+<text x="42" y="500" fill="#d7c38d" opacity=".2" font-family="serif" font-size="22" letter-spacing="8">陨铁采掘场</text>
+</svg>

@@ -228,13 +228,29 @@ func (e *Engine) updateBossPhase(run *Run, enemy EnemyDef, messages *[]string) {
 	switch phase {
 	case 2:
 		combat.EnemyDefense++
-		*messages = append(*messages, "【Boss 二阶段】王冠的外环裂开，赫里昂拔出第二道锁链，防御提升。")
-		e.log(run, "boss", "赫里昂进入第二阶段：王冠开始直接操纵墓城残响。")
+		if enemy.ID == "gate_heart" {
+			*messages = append(*messages, "【最终 Boss 二阶段】黑色心脏裂开一圈星光，整个心室开始随它收缩。防御提升。")
+			e.log(run, "boss", "门后之心进入第二阶段：封印空间开始主动挤压入侵者。")
+		} else {
+			*messages = append(*messages, "【Boss 二阶段】王冠的外环裂开，赫里昂拔出第二道锁链，防御提升。")
+			e.log(run, "boss", "赫里昂进入第二阶段：王冠开始直接操纵墓城残响。")
+		}
 	case 3:
 		combat.EnemyDefense++
-		combat.PlayerStatuses = addStatus(combat.PlayerStatuses, StatusState{ID: "weakened", Name: "王名压迫", Description: "攻击检定 -2。", Rounds: 2, Stacks: 1})
-		*messages = append(*messages, "【Boss 三阶段】王座后的十三道锁链全部绷紧，黑火吞没整个大厅。")
-		e.log(run, "boss", "赫里昂进入第三阶段：第十三道锁链显现。")
+		name := "王名压迫"
+		desc := "攻击检定 -2。"
+		if enemy.ID == "gate_heart" {
+			name = "门后凝视"
+			desc = "现实边界正在变薄，攻击检定 -2。"
+		}
+		combat.PlayerStatuses = addStatus(combat.PlayerStatuses, StatusState{ID: "weakened", Name: name, Description: desc, Rounds: 2, Stacks: 1})
+		if enemy.ID == "gate_heart" {
+			*messages = append(*messages, "【最终 Boss 三阶段】心室失去上下方向，黑门完全睁开。")
+			e.log(run, "boss", "门后之心进入第三阶段：现实与门后的空间开始重叠。")
+		} else {
+			*messages = append(*messages, "【Boss 三阶段】王座后的十三道锁链全部绷紧，黑火吞没整个大厅。")
+			e.log(run, "boss", "赫里昂进入第三阶段：第十三道锁链显现。")
+		}
 	}
 }
 
@@ -332,7 +348,7 @@ func (e *Engine) enemyAttackOnce(run *Run, enemy EnemyDef, attackMod, damageMod 
 	if combat == nil {
 		return -1
 	}
-	attackRoll := e.roll(run, "enemy-"+combat.Intent.Kind+"-"+label, 20) + enemy.Attack + attackMod + run.Clock.Threat/2
+	attackRoll := e.roll(run, "enemy-"+combat.Intent.Kind+"-"+label, 20) + enemy.Attack + attackMod + run.Clock.Threat/2 - statusStacks(combat.EnemyStatuses, "weakened")*2
 	defense := run.Player.Defense
 	if combat.Guarded {
 		defense += 4

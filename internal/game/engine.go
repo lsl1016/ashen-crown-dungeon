@@ -223,6 +223,9 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 			if run.Player.Equipment["weapon"] == "sunken_mace" && (combat.Intent.Kind == "heavy" || combat.Intent.Kind == "charge") {
 				dmg += 3
 			}
+			if run.Player.Equipment["weapon"] == "starsteel_blade" && (combat.Intent.Kind == "heavy" || combat.Intent.Kind == "charge" || enemy.Archetype == "构装") {
+				dmg += 3
+			}
 			combat.EnemyHP -= max(1, dmg)
 			messages = append(messages, fmt.Sprintf("你命中%s，造成 %d 点伤害。", combat.EnemyName, max(1, dmg)))
 		} else {
@@ -398,7 +401,7 @@ func (e *Engine) ItemAction(run *Run, itemID, action string) error {
 		return errors.New("未知物品操作")
 	}
 	switch itemID {
-	case "healing_draught", "bandage":
+	case "healing_draught", "bandage", "star_salve":
 		if run.Combat != nil {
 			return errors.New("战斗中请使用战斗行动栏的药剂动作")
 		}
@@ -442,6 +445,15 @@ func (e *Engine) ItemAction(run *Run, itemID, action string) error {
 		removeItem(&run.Player, itemID)
 		run.Combat.EnemyStatuses = addStatus(run.Combat.EnemyStatuses, StatusState{ID: "burn", Name: "燃烧", Description: "灼灰持续燃烧。", Rounds: 3, Stacks: 1})
 		e.log(run, "item", "灼灰瓶在敌人身上炸开，施加了 3 回合燃烧。")
+		e.spendCombatItemTurn(run, item.Name)
+	case "storm_phial":
+		if run.Combat == nil {
+			return errors.New("瓶装灰暴只能在战斗中使用")
+		}
+		removeItem(&run.Player, itemID)
+		run.Combat.EnemyStatuses = addStatus(run.Combat.EnemyStatuses, StatusState{ID: "weakened", Name: "灰暴弱化", Description: "攻击节奏被灰暴打乱。", Rounds: 2, Stacks: 1})
+		run.Combat.Guarded = true
+		e.log(run, "item", "你释放瓶装灰暴，敌人被弱化，你也借风势进入防御姿态。")
 		e.spendCombatItemTurn(run, item.Name)
 	default:
 		if item.Slot != "" {
@@ -539,6 +551,12 @@ func (e *Engine) triggerRoom(run *Run, room *Room) {
 		e.startCombat(run, id)
 	case "boss":
 		e.startCombat(run, "crown_bearer")
+	case "ashfield", "ruins":
+		ids := []string{"ash_raider", "glass_walker", "dune_wraith", "sky_leech", "storm_knight"}
+		id := ids[int(hash64(fmt.Sprintf("v04-combat:%d:%s", run.Seed, room.ID))%uint64(len(ids)))]
+		e.startCombat(run, id)
+	case "finalboss":
+		e.startCombat(run, "gate_heart")
 	case "npc":
 		if !run.Flags["met_scout"] {
 			run.Flags["met_scout"] = true
@@ -561,8 +579,8 @@ func (e *Engine) triggerRoom(run *Run, room *Room) {
 		}
 		run.Flags["seen_"+id] = true
 		e.startEvent(run, id, room)
-	case "chapel", "library", "flooded", "prison", "garden", "ossuary", "forge", "observatory", "banquet", "merchant", "rest", "shrine", "treasure", "secret", "infirmary", "gatehouse", "aqueduct", "bridge", "court", "belltower", "reliquary", "mausoleum":
-		// V0.3 的特色地点不再强制弹事件；玩家直接点击场景中的热点触发内容。
+	case "chapel", "library", "flooded", "prison", "garden", "ossuary", "forge", "observatory", "banquet", "merchant", "rest", "shrine", "treasure", "secret", "infirmary", "gatehouse", "aqueduct", "bridge", "court", "belltower", "reliquary", "mausoleum", "frontier", "caravan", "glassmarsh", "crater", "starwatch", "windshrine", "meteor", "windcamp", "outergate":
+		// 特色地点不强制弹事件；玩家直接点击场景中的热点触发内容。
 		room.Resolved = true
 		e.log(run, "story", "这里有多个可调查目标。场景中发光的标记可以直接点击。")
 	default:
@@ -628,22 +646,38 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 	}
 
 	if enemy.Boss {
-		run.Flags["defeated_crown_bearer"] = true
-		if q := run.Quests["ashen_crown"]; q != nil {
-			q.Progress = 1
-			q.Status = "completed"
+		if enemy.ID == "crown_bearer" {
+			run.Flags["defeated_crown_bearer"] = true
+			if q := run.Quests["ashen_crown"]; q != nil {
+				q.Progress = 1
+				q.Status = "completed"
+			}
+			if room := run.Rooms["room_33"]; room != nil {
+				room.Locked = false
+				room.Discovered = true
+			}
+			if run.Quests["beyond_mist"] == nil {
+				run.Quests["beyond_mist"] = &QuestState{ID: "beyond_mist", Title: "第二幕 · 雾外荒原", Description: "赫里昂倒下后，王座后的石门打开。沿灰风向东，找到真正被王冠压住的那扇门。", Status: "active", Goal: 1}
+			}
+			run.Flags["act2_unlocked"] = true
+			msg += " 赫里昂没有化成灰。他把最后一道王冠锁链扯断，王座后的石墙随之裂开。冷风第一次从墓城之外吹入——真正的封印还在雾外荒原。第二幕已经开启。"
+			e.log(run, "act", "第二幕开启：雾外荒原。地图东侧出现一条通往地表的道路。")
+		} else if enemy.ID == "gate_heart" {
+			run.Flags["defeated_gate_heart"] = true
+			if q := run.Quests["beyond_mist"]; q != nil {
+				q.Progress = 1
+				q.Status = "completed"
+			}
+			run.Victory = true
+			run.GameOver = true
+			ending := "门后之心停止跳动。灰雾第一次被真正的风吹散，你看见维尔之外仍有无数封印遗迹。你没有结束这个世界的危险，但至少终止了这一次苏醒。"
+			if run.Flags["accepted_wind_oath"] && run.Flags["heard_true_name"] && hasItem(run.Player.Inventory, "void_compass") {
+				ending = "你用赫里昂的真名固定最后一条锁链，再以风誓把门后的心跳转移到无人记得的星图中。黎明照进荒原，墓城与灰雾同时开始退去。维尔第一次从历史里重新拥有名字。"
+			} else if run.Flags["touched_star_wound"] && run.Flags["knows_last_price"] {
+				ending = "你以坠星之力切断封印的遗忘循环。门关闭了，但代价是从此只有你记得赫里昂、墓城和这场战争。荒原上的人会称你为一个没有来历的旅者。"
+			}
+			msg += " " + ending
 		}
-		run.Victory = true
-		run.GameOver = true
-		ending := "赫里昂消散前只说：‘王冠不是王权，是门闩。’你带着残缺的真相离开墓城。封印仍在，但再没有人知道它还能维持多久。"
-		if run.Flags["heard_true_name"] && hasItem(run.Player.Inventory, "royal_signet") && run.Flags["knows_crown_truth"] {
-			ending = "你以赫里昂的完整真名唤醒了王座后的意识，又用王印重写十三道锁链。旧王终于从三百年的职责中解脱，墓城第一次迎来真正的黎明。"
-		} else if hasItem(run.Player.Inventory, "crown_fragment") && run.Flags["knows_last_price"] {
-			ending = "你没有继承王冠，而是利用残片与第十三种代价拆解了封印的自我遗忘循环。墓城开始崩塌，但门仍被锁在更深处。你成为唯一记得这座城市为何消失的人。"
-		} else if run.Flags["merchant_rumor"] && run.Flags["saw_false_crown"] {
-			ending = "你识破王座上的王冠只是投影，没有触碰真正的封印。赫里昂的残响消失，王庭却仍在呼吸。你选择把地图带回巡夜团，准备下一次更深入的远征。"
-		}
-		msg += " " + ending
 	}
 	run.Combat = nil
 	e.log(run, "combat", msg)

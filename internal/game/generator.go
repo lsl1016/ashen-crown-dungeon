@@ -95,6 +95,11 @@ func GenerateDungeon(seed int64) (map[string]*Room, []Edge) {
 	rooms["room_31"].Discovered = false
 	rooms["room_32"].Locked = true
 	rooms["room_32"].Discovered = false
+	// 第二幕在击败赫里昂之后开启；最终心室还需要在荒原中找到开启方式。
+	rooms["room_33"].Locked = true
+	rooms["room_33"].Discovered = false
+	rooms["room_44"].Locked = true
+	rooms["room_44"].Discovered = false
 
 	edges := make([]Edge, 0, len(baseEdges)+3)
 	for _, pair := range baseEdges {
@@ -114,6 +119,9 @@ func GenerateDungeon(seed int64) (map[string]*Room, []Edge) {
 }
 
 func sceneForType(t string, variant int) string {
+	if scene, ok := v04SceneByType[t]; ok {
+		return scene
+	}
 	switch t {
 	case "entrance":
 		return "entrance"
@@ -186,6 +194,10 @@ func sceneForType(t string, variant int) string {
 
 func zoneForX(x int) string {
 	switch {
+	case x >= 15:
+		return "荒原东界"
+	case x >= 10:
+		return "雾外荒原"
 	case x <= 1:
 		return "外墓区"
 	case x <= 3:
@@ -200,6 +212,9 @@ func zoneForX(x int) string {
 }
 
 func roomDescription(t string) string {
+	if desc, ok := v04DescriptionByType[t]; ok {
+		return desc
+	}
 	switch t {
 	case "combat":
 		return "地上拖痕凌乱，墙角还有刚被碰落的灰尘。你能感觉到有什么东西正沿着柱影移动。"
@@ -261,6 +276,17 @@ func roomDescription(t string) string {
 func elementsForRoom(t, roomID string, seed int64) []SceneElement {
 	// X/Y 是场景画布百分比坐标。元素本身只是数据，前端负责渲染热点。
 	common := []SceneElement{}
+	if extra, ok := v04ElementsForRoom(t, roomID); ok {
+		common = extra
+		ambientPick := int(hash64(fmt.Sprintf("ambient-v04:%d:%s", seed, roomID)) % 3)
+		ambients := []SceneElement{
+			{ID: "v04_ambient_wind", Kind: "object", Label: "灰风涡流", Description: "风在这里围着看不见的物体打转。", Icon: "〰", X: 15, Y: 62, Action: "message", Target: "你伸手探进涡流，短暂触到一片冰冷表面，像门的背面。", OneShot: true},
+			{ID: "v04_ambient_star", Kind: "object", Label: "逆坠星屑", Description: "几粒星屑缓慢向天空坠落。", Icon: "·", X: 84, Y: 58, Action: "message", Target: "星屑越过你的指尖继续上升。荒原的重力正在被某个更大的东西拉扯。", OneShot: true},
+			{ID: "v04_ambient_bone", Kind: "object", Label: "风蚀骨牌", Description: "刻着已经消失的商队编号。", Icon: "▱", X: 18, Y: 72, Action: "message", Target: "骨牌上的路线终点不是城市，而是一个被反复涂黑的圆。", OneShot: true},
+		}
+		common = append(common, ambients[ambientPick])
+		return common
+	}
 	switch t {
 	case "entrance":
 		common = []SceneElement{

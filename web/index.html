@@ -20,7 +20,7 @@
       <p id="worldPremise" class="premise">正在读取墓城记录……</p>
 
       <div class="feature-strip">
-        <span><b>32</b> 地点</span><i></i><span><b>条件式</b> 场景交互</span><i></i><span><b>12</b> 职业天赋</span><i></i><span><b>意图制</b> 战斗</span>
+        <span><b>44</b> 地点</span><i></i><span><b>双幕</b> 世界推进</span><i></i><span><b>12</b> 职业天赋</span><i></i><span><b>意图制</b> 战斗</span>
       </div>
 
       <div class="start-form">
@@ -33,7 +33,7 @@
         <button id="openSavesBtn" class="btn ghost large">读取存档</button>
         <button id="worldBtn" class="btn ghost large">世界档案</button>
       </div>
-      <p class="start-tip">V0.3 · 不接 AI。加入敌人意图、Boss 多阶段、天赋 Build、三槽装备、条件机关、世界钟声与 32 地点持续世界。</p>
+      <p class="start-tip">V0.4 · 不接 AI。双幕战役、44 地点、场景角色实体、伤害/技能特效、Boss 入场与转阶段演出、合成音效，以及雾外荒原第二大区域。</p>
     </section>
   </div>
 
@@ -42,6 +42,7 @@
       <div class="brand"><span class="brand-mark">♛</span><div><strong>灰烬王冠</strong><small>沉眠墓城 · 第十三钟前夜</small></div></div>
       <div class="top-center"><span id="roomBreadcrumb">外墓区 / 入口</span><span class="seed-chip">BELL <b id="bellLabel">I / XIII</b></span><span class="seed-chip">SEED <b id="seedLabel">-</b></span></div>
       <div class="top-actions">
+        <button id="soundBtn" class="icon-btn text-btn" title="声音开关">声音 ON</button>
         <button id="talentBtn" class="icon-btn text-btn talent-top" title="职业天赋">天赋 <b id="talentPointBadge">1</b></button>
         <button id="codexBtn" class="icon-btn text-btn" title="发现档案">档案</button>
         <button id="journalBtn" class="icon-btn text-btn" title="冒险日志">日志</button>
@@ -82,6 +83,10 @@
             <span id="interactionCounter">0 个可调查目标</span>
           </div>
 
+          <div id="sceneEntityLayer" class="scene-entity-layer">
+            <div id="playerActor" class="player-actor"><span id="playerActorIcon">🛡️</span><i></i></div>
+          </div>
+          <div id="vfxLayer" class="vfx-layer"></div>
           <div id="hotspotLayer" class="hotspot-layer"></div>
 
           <div class="scene-caption">
@@ -109,6 +114,8 @@
             <div id="intentCard" class="intent-card"><span id="intentIcon">⚔</span><div><small>NEXT INTENT</small><b id="intentLabel">试探攻击</b><p id="intentDescription"></p></div></div>
           </div>
 
+          <div id="cinematicOverlay" class="cinematic-overlay hidden"><small id="cinematicKicker">ACT II</small><h2 id="cinematicTitle">雾外荒原</h2><p id="cinematicText"></p></div>
+
           <div id="diceOverlay" class="dice-overlay hidden">
             <div class="dice-result" id="diceResultLabel">检定</div>
             <div class="d20"><span id="diceValue">20</span></div>
@@ -125,7 +132,7 @@
       </section>
 
       <aside class="right-panel panel">
-        <div class="section-title"><span>墓城地图</span><small id="mapProgress">0 / 24</small></div>
+        <div class="section-title"><span>世界地图</span><small id="mapProgress">0 / 44</small></div>
         <div id="mapCanvas" class="map-canvas"><svg id="mapSvg" viewBox="-35 -30 900 610" preserveAspectRatio="xMidYMid meet"></svg></div>
         <p class="map-help"><b>亮金节点</b>是当前位置，带脉冲外圈的节点可直接前往。锁形节点需要场景机关、钥匙或线索才能开启。</p>
 
