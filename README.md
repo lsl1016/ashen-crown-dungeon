@@ -1,8 +1,10 @@
-# 灰烬王冠：沉眠墓城 v0.6.0
+# 灰烬王冠：沉眠墓城 v0.7.0 — Living World
 
-一个不依赖 AI 也能完整运行的本地 Dungeon / TRPG RPG 原型。V0.6 在 V0.5 的双幕战役、NPC 对话、商店和成长系统之上，继续加入**持续世界模拟**：NPC 会迁移、区域会改变状态、任务有阶段与回报结局、商店随钟声补货、装备会出现确定性词条，战斗加入近 / 中 / 远三档站位。
+一个不依赖 AI 也能完整运行的本地 Dungeon / TRPG RPG 原型。
 
-> 当前版本刻意没有接入 LLM。Game Runtime 先负责事实、规则和持久化；未来 DM Agent 只通过受控 Tool 解释自然语言并操作这些能力，而不是运行时修改代码。
+V0.7 在 V0.6 的双幕战役、持续世界、NPC、任务、商店、装备词条和距离战斗之上，继续把游戏推进成一个**可模拟、可编辑、未来可由 Agent 操作的 Living World Runtime**：世界事件会随钟声出现和恶化，NPC 拥有结构化日程，支线任务出现真正的分叉结局，职业技能改成数据驱动，战斗场景拥有地形危险带，并加入本地 GM Editor。
+
+> 当前版本仍然**没有接入任何 LLM**。世界事实、规则校验、随机数、任务状态、NPC 位置、战斗结果和内容持久化都由 Game Runtime 决定。未来 DM Agent 只能通过受控 Tool 操作这些能力。
 
 ## 直接运行
 
@@ -14,13 +16,19 @@
 start-windows.bat
 ```
 
-然后访问：
+然后打开：
 
 ```text
 http://localhost:8080
 ```
 
-压缩包内已经包含 Windows amd64 可执行文件，不需要 Go、Node 或 npm。
+GM 编辑器：
+
+```text
+http://localhost:8080/editor
+```
+
+压缩包内已经包含 Windows amd64 可执行文件，不需要安装 Go、Node 或 npm。
 
 ### Linux
 
@@ -36,220 +44,417 @@ chmod +x start-macos-arm64.sh dist/ashen-crown-macos-arm64
 ./start-macos-arm64.sh
 ```
 
-也可以从源码运行：
+### 源码运行
 
 ```bash
 go run ./cmd/server -web ./web -data ./data
 ```
 
-## V0.6 主要变化
+---
 
-### 1. NPC 日程和迁移
+# V0.7 核心变化
 
-NPC 不再永远固定在出生房间。位置记录在 `Run.npcLocations`，会根据世界钟声和任务结果变化。例如：
+## 1. 世界事件调度器
 
-- 伊文：断桥营火 → 第七钟后的灰疫医馆 → 巡夜任务交付后的墓城入口。
-- 帷面客：无脸商铺 → 第二幕开放且钟声推进后迁往雾外界碑。
-- 无名囚徒：旧王囚室 → 找回名字后前往巡夜营地。
-- 奥林：无旗骑士营 → 宣誓或黑门开启后前往外封印黑门。
-- 玛拉：逐风营火 → 风暴骑士任务回报后前往雾外界碑。
-
-场景中的 NPC 立绘和底部行动按钮都从这份状态动态生成，因此 NPC 搬走以后旧位置不会留下一个“假 NPC”。
-
-### 2. 区域状态演化
-
-`Run.regionStates` 保存 7 个区域的当前状态，例如：
+世界不再只通过固定 Flag 变化。V0.7 新增结构化 `WorldEventDef / WorldEventState`：
 
 ```text
-外墓区    灰雾封锁
-旧城区    残响不稳定
-内廷      王庭警戒
-雾外荒原  尚未抵达
-荒原东界  黑门封闭
+第 4 钟
+  ↓
+灰疫潮出现
+  ↓
+外墓区场景进入 plague 状态
+  ↓
+NPC 行动 / 区域描述 / 战斗危险带改变
+  ↓
+第 7 钟仍未解决
+  ↓
+事件升级
+  ↓
+玩家完成对应任务分支
+  ↓
+世界事件结束并留下持久后果
 ```
 
-随着钟声、Boss、支线和黑门推进，这些状态会持久变化，例如：
+当前世界事件包括：
+
+- 灰疫潮
+- 无名游行
+- 王庭猎名
+- 灰暴锋线
+
+事件拥有：
 
 ```text
-外墓区
-灰雾封锁
-  ↓ 第七钟
-灰雾加深 · 巡夜线失联
-  ↓ 完成并交付巡夜支线
-巡夜团重新建立哨线
+triggerBell
+escalateBell
+requireFlag
+resolveFlag
+severity
+overlay
+region
 ```
 
-右侧世界脉冲、附近道路和世界信息面板都会读取真实区域状态。
+同一份定义会同时被 Game Runtime、前端世界事件面板、GM Editor 和未来 Agent 使用。
 
-### 3. 真正的任务链阶段和结局
+## 2. NPC 结构化日程
 
-任务不再只有 `active / completed`，还包含：
+NPC 不再只有一个“当前房间”。V0.7 新增：
 
 ```text
-stage
-outcome
+NPCScheduleDef
+NPCWorldState
 ```
 
-例如巡夜支线：
+NPC 世界事实包括：
 
 ```text
-接受任务
-  ↓
-寻找队长
-  ↓
-完成目标
-  ↓
-返回交付
-  ↓
-伊文确认记录
-  ↓
-结局：巡夜线重建
-  ↓
-NPC 迁移 + 区域状态变化 + 金币 + 独特饰品
+location
+activity
+health
+mood
+knowledge
 ```
 
-目前带回报后果的支线包括巡夜队、无名囚徒和风暴骑士。
+例如伊文会随着钟声在断桥营火、灰疫医馆之间行动；任务结果又可以改变其最终去向。
 
-### 4. 商店随世界钟刷新
-
-两套商店库存仍然持久化，但现在会按世界钟自动补货：
-
-- 每推进 3 个钟声周期检查一次。
-- 普通装备逐步补 1 件。
-- 消耗品最多补 2 件。
-- 第十三钟停止后不再自动刷新。
-- 商店 UI 会显示最近补货和下一轮补货钟声。
-
-商店位置还会随商人迁移而变化。
-
-### 5. 装备随机词条
-
-V0.6 新增 8 个词条：
-
-- 锋锐：武器威力 +1
-- 墓锻：武器威力 +2
-- 坚固：防御 +1
-- 强韧：最大生命 +4
-- 共鸣：最大能量 +2
-- 守望：感知 +1
-- 不屈：意志 +1
-- 逐风：敏捷 +1
-
-精英战利品和部分购买装备会根据 `WorldSeed + Item + 来源` 生成确定性词条。同一个世界可重放，不会因读档变成另一件装备。
-
-当前原型按 `itemId` 保存词条，因此同一基础物品的多个副本共享词条；如果后续进入正式装备刷取阶段，可以进一步升级成独立 `itemInstanceId`。
-
-V0.6 新装备包括：
-
-- 第三巡夜哨坠
-- 复名银印
-- 空钟披扣
-- 墓玻璃长刃
-- 残响鳞衣
-- 坠星透镜
-
-### 6. 近 / 中 / 远三档战斗站位
-
-战斗增加：
+GM / 未来 AI 可以通过受控操作临时固定 NPC 到某个地点：
 
 ```text
-近距 ← 推进 / 后撤 → 中距 ← 推进 / 后撤 → 远距
+NPCOverrides
 ```
 
-职业默认距离：
+该 Override 会真实进入存档，不会被下一次自动日程刷新覆盖；也可以恢复为自动日程。
 
-- 铁誓守卫：近距
-- 暮影游侠：中距
-- 余烬术士：远距
+## 3. 真正的支线分叉任务图
 
-站位不是纯 UI：
-
-- 守卫远距离普通攻击会受到命中惩罚。
-- 游侠可以通过远距天赋增加命中和伤害。
-- 近战型敌人在远距攻击会降低命中和伤害，并可能使用“逼近”。
-- Boss 的冲锋会直接压到近距。
-- 推进和后撤消耗一个完整战斗回合，敌人仍会执行当前 Intent。
-
-玩家实体会随着距离在场景内移动，距离 UI 也展示三档状态。
-
-### 7. 三阶职业天赋树
-
-V0.5 的 12 个职业天赋保留，同时新增 6 个高阶天赋，总计 18 个，并增加：
+三条主要支线已经从单线：
 
 ```text
-Tier
-RequiredLevel
-Requires
+接受 → 目标 → 交付 → 奖励
 ```
 
-部分新天赋：
+升级成 `QuestGraph`：
+
+```text
+              ┌→ 公开赛勒记录 → 重建巡夜哨线
+巡夜队任务 ──┤
+              └→ 封存记录     → 表面秩序保留 / 真相消失
+```
+
+```text
+              ┌→ 归还真名 → 无名游行开始恢复姓名
+无名囚徒 ─────┤
+              └→ 重新封名 → 游行停止 / 真名再次被抹去
+```
+
+```text
+              ┌→ 共享路线 → 逐风者掌握安全风道
+风暴骑士 ─────┤
+              └→ 隐瞒路线 → 商路开放 / 阵营关系恶化
+```
+
+Run 新增：
+
+```text
+quest.stage
+quest.outcome
+questDecisions
+```
+
+不同结局会影响：
+
+- NPC 关系
+- NPC 行动
+- 区域状态
+- 世界事件是否解决
+- 金币 / 独特物品
+- 后续世界叙事
+
+并且已经处理“分支完成后再次对话重复领奖”的问题。
+
+## 4. 数据驱动 Skill / Effect
+
+职业技能不再把每一个行为写死在 `switch` 里。
+
+结构示例：
+
+```json
+{
+  "id": "warden_chainbreaker",
+  "class": "warden",
+  "name": "断链冲锋",
+  "cost": 2,
+  "cooldown": 3,
+  "minDistance": 1,
+  "maxDistance": 3,
+  "hitAttribute": "strength",
+  "effects": [
+    {"type": "set_distance", "value": 1},
+    {"type": "damage", "value": 4, "dice": 6},
+    {"type": "enemy_status", "target": "weakened", "rounds": 2}
+  ]
+}
+```
+
+V0.7 内置 6 个结构化技能：
 
 **铁誓守卫**
-- 不动锚誓：防御恢复生命，近距额外防御。
-- 铁墙推进：推进时同时防御并恢复能量。
+- 铁誓猛击
+- 断链冲锋
 
 **暮影游侠**
-- 雾外长射：远距普通攻击命中 +1、伤害 +3。
-- 无痕撤步：后撤时保持防御，到远距恢复能量。
+- 弱点穿刺
+- 灰幕箭
 
 **余烬术士**
-- 星火过载：远距职业技基础伤害 +4。
-- 残响移步：后撤恢复能量并重建符文护幕。
+- 余烬爆裂
+- 护幕星火
 
-UI 会明确显示 Tier、等级要求和前置天赋。
-
-## 已保留的 V0.5 / V0.4 能力
-
-- 双幕 44 地点完整 Campaign。
-- 133 个场景交互。
-- 35 个剧情 / 随机事件。
-- 21 类敌人和 Boss，21 套独立战斗立绘。
-- 48 种物品（包含 V0.6 新增装备与既有剧情/战斗物品）。
-- 5 个持久 NPC、5 棵对话树、关系系统。
-- 两套商店，买入 / 卖出 / 库存 / 金币。
-- 3 个职业和多帧 Idle / Attack / Cast 动作。
-- 敌人 Intent、异常状态、Boss 三阶段。
-- 属性点、精通点、职业天赋点。
-- 条件场景交互、隐藏房间和机关。
-- Seed 确定性地图 / 事件 / 骰子 / 内容生成。
-- 自动 Run 持久化、手动存档、读取存档。
-- Event Log / Journal / Lore Codex。
-- WebAudio 本地合成音效。
-- AI Tool Boundary（仍未接模型）。
-
-## 操作方式
-
-### 探索
-
-- 点击场景发光热点调查物件。
-- 点击场景 NPC 直接开始对话。
-- 底部行动栏提供相同的显式操作入口。
-- 右侧地图中的脉冲节点可直接移动。
-- 部分机关需要物品、Flag 或属性检定。
-
-### 战斗
+目前 Effect Runtime 已支持本版技能所需的：
 
 ```text
-1 普通攻击
-2 职业技能
-3 防御
-4 推进
-5 后撤
-6 使用药剂
-7 尝试脱离
+damage
+guard
+shield
+energy
+set_distance
+retreat
+enemy_status
 ```
 
-应结合：
+后续可以继续扩展 `heal / poison / summon / teleport / push / pull` 等，而无需为每个新技能重新写一整段战斗流程。
 
-- 敌人下一步 Intent
-- 当前近 / 中 / 远距离
-- 自身状态
-- 职业天赋
-- 武器与词条
+## 5. 战场地形与危险带
 
-决定行动。
+V0.6 的近 / 中 / 远距离现在开始和场景发生联系。
 
-## 项目结构
+例子：
+
+```text
+断桥 / 门楼
+远距：利用断柱掩体，防御 +2
+```
+
+```text
+黑水引渠
+近距：黑水侵蚀，每回合末受伤
+```
+
+```text
+冷炉
+中距：炉底裂口造成灼灰伤害
+```
+
+```text
+雾外荒原
+中距：灰暴带造成风蚀伤害
+```
+
+世界事件还能叠加新的危险带：
+
+- 灰疫潮 → 远距孢雾
+- 无名游行 → 中距失名残响
+- 王庭猎名 → 近距黑火
+- 灰暴锋线 → 远距灰暴
+
+因此推进 / 后撤第一次同时具备：
+
+```text
+攻击距离决策
++
+敌人 Intent 决策
++
+战场地形决策
+```
+
+## 6. SceneState：世界变化真正改变场景
+
+每个房间现在都有派生 `SceneState`：
+
+```text
+stable
+secured
+danger
+plague
+echo
+blackfire
+storm
+```
+
+前端会根据真实场景状态改变：
+
+- 环境 Overlay
+- 粒子 / 光效
+- 区域标签
+- 世界事件展示
+- 战斗 Hazard
+
+因此“灰疫潮正在外墓区发生”不再只是一段日志文字。
+
+## 7. 本地 GM Editor
+
+访问：
+
+```text
+http://localhost:8080/editor
+```
+
+这是 V0.7 最重要的开发基础设施之一。
+
+### 内容库
+
+可以查看、搜索、新建、复制并覆盖：
+
+```text
+Item
+Enemy
+Event
+NPC
+Dialogue
+Shop
+Skill
+WorldEvent
+NPCSchedule
+QuestGraph
+```
+
+覆盖内容保存到：
+
+```text
+data/editor/content_overrides.json
+```
+
+服务重启后会自动重新加载，不需要重新编译 Go。
+
+QuestGraph 还带基础节点预览。
+
+### Live Run
+
+GM Editor 可以直接选择本地正在运行的 Run，并执行：
+
+- 推进世界钟
+- 强制触发世界事件
+- 移动 NPC
+- 恢复 NPC 自动日程
+- 修改区域状态
+- 设置世界 Flag
+- 查看当前世界事件
+- 查看 NPC 当前行为 / 地点 / 心情
+- 查看区域状态
+- 查看真实 Flag
+
+### 地点编辑器
+
+可以：
+
+- 编辑现有 Room JSON
+- 创建新地点
+- 指定地图坐标
+- 指定 Zone / Scene / Type
+- 添加场景 Element
+- 将新地点连接到已有地点
+- 查看当前 Run 的实时小地图
+
+GM 页面不会直接编辑存档文件，而是通过受控 HTTP API 调用 Game Runtime。
+
+> GM Editor 当前没有身份认证，只设计给本地开发使用。不要把该服务直接暴露到公网。
+
+## 8. V0.7 为未来 AI 增加的 Tool Boundary
+
+除原有：
+
+```text
+create_room
+connect_rooms
+reveal_room
+set_flag
+grant_item
+spawn_enemy
+```
+
+新增：
+
+```text
+move_npc
+set_region_state
+trigger_world_event
+```
+
+未来 DM Agent 依然不允许直接修改 Go / JS / 存档 JSON。
+
+---
+
+# 当前内容规模
+
+```text
+44   地图地点
+133  场景交互元素
+35   剧情 / 随机事件
+21   类敌人 / Boss
+48   种物品
+18   个职业天赋
+8    种装备词条
+6    个数据驱动职业技能
+5    个持久 NPC
+5    棵 NPC 对话树
+5    套 NPC 日程定义
+3    棵分支 QuestGraph
+4    个 Living World Event
+2    套动态商店
+7    个持续变化区域
+3    档战斗距离
+104  个本地 SVG 资源
+```
+
+V0.4–V0.6 已有的双幕 Campaign、Boss 三阶段、敌人 Intent、角色动画、NPC 立绘、商店、关系、成长、装备 Build、词条、存档和 World Seed 均保留。
+
+---
+
+# 操作方式
+
+## 探索
+
+- 点击场景热点调查。
+- 点击 NPC 立绘开始对话。
+- 底部行动栏提供显式操作入口。
+- 右侧地图脉冲节点可移动。
+- 部分互动需要物品、Flag、属性检定或前置世界状态。
+
+## 战斗
+
+战斗按钮现在会根据角色真正拥有的 `player.skills` 动态生成。
+
+基础行动包括：
+
+```text
+普通攻击
+职业技能 × 2
+防御
+推进
+后撤
+使用消耗品
+尝试脱离
+```
+
+应综合：
+
+```text
+敌人 NEXT INTENT
+当前近 / 中 / 远距离
+Battlefield Terrain
+当前 Hazard
+自身 / 敌人状态
+装备和词条
+职业天赋
+技能 Cost / Cooldown / Range
+```
+
+做决策。
+
+---
+
+# 项目结构
 
 ```text
 ashen-crown-dungeon/
@@ -259,12 +464,15 @@ ashen-crown-dungeon/
 │   ├── content.go
 │   ├── content_v04.go
 │   ├── content_v05.go
-│   ├── content_v06.go        # V0.6 词条、高阶天赋、任务回报
+│   ├── content_v06.go
+│   ├── content_v07.go         # Skill / WorldEvent / Schedule / QuestGraph
+│   ├── editor.go              # 内容覆盖 + GM 地点操作
 │   ├── engine.go
 │   ├── generator.go
 │   ├── systems_v03.go
 │   ├── systems_v05.go
-│   ├── systems_v06.go        # NPC 日程、区域、刷新、词条、距离系统
+│   ├── systems_v06.go
+│   ├── systems_v07.go         # Living World + Skill Runtime + Terrain + GM
 │   ├── tools.go
 │   ├── types.go
 │   └── store.go
@@ -274,27 +482,31 @@ ashen-crown-dungeon/
 │   ├── index.html
 │   ├── app.js
 │   ├── styles.css
+│   ├── editor.html
+│   ├── editor.js
+│   ├── editor.css
 │   └── assets/
-│       ├── actors/
-│       ├── portraits/
-│       └── scenes/
 ├── docs/
 │   ├── V05_SYSTEMS.md
 │   ├── V06_SYSTEMS.md
+│   ├── V07_SYSTEMS.md
 │   ├── AI_INTEGRATION.md
 │   └── ...
 ├── data/
 ├── dist/
 ├── Dockerfile
 ├── docker-compose.yml
+├── VERSION
 ├── start-windows.bat
 ├── start-linux.sh
 └── start-macos-arm64.sh
 ```
 
-## HTTP API
+---
 
-主要接口：
+# HTTP API
+
+游戏接口：
 
 ```text
 GET  /api/health
@@ -318,42 +530,66 @@ GET  /api/saves
 POST /api/saves/{id}/load
 ```
 
-## 存档兼容
-
-V0.6 对 V0.5 旧 Run 做运行时归一化：
+GM Editor：
 
 ```text
-npcLocations
-regionStates
-shopRefresh
-itemAffixes
-quest.stage
-quest.outcome
-combat.distance
+GET  /api/editor/content
+GET  /api/editor/overrides
+GET  /api/editor/runs
+POST /api/editor/content
+POST /api/editor/runs/{id}/world
+POST /api/editor/runs/{id}/room
 ```
 
-旧字段不存在时会自动补默认值。HTTP 修改请求会在写盘前再次归一化，确保由任务、钟声产生的 NPC 迁移和区域变化也真正进入存档。
+---
 
-建议发布版仍从新存档体验完整 V0.6，因为旧存档已经发生过的 V0.5 历史事件无法凭空还原成所有新阶段语义。
+# 存档兼容
 
-## AI 接入边界
+`Engine.Prepare(run)` 会继续兼容 V0.5 / V0.6 Run，并补齐 V0.7 字段：
 
-正式接 AI 后仍建议保持：
+```text
+player.skills
+worldEvents
+npcWorld
+sceneStates
+questDecisions
+npcOverrides
+regionOverrides
+combat.terrain
+combat.hazards
+```
+
+旧存档可以继续加载，但建议新版本从新 Run 体验完整 Living World，因为过去已经发生过的历史事件无法完全逆推出新的世界事件阶段。
+
+---
+
+# AI 接入原则
+
+正式接 AI 后保持：
 
 ```text
 玩家自然语言
     ↓
 DM Agent
     ↓
+读取真实 Run / World State
+    ↓
 结构化意图 / Tool Call
     ↓
 Game Runtime 校验
     ↓
-修改 Run / World State
+Run / World State 改变
     ↓
 前端表现
 ```
 
-AI 不直接写 Go / JavaScript，不直接改数据库 JSON，也不自行宣告不存在的世界事实。
+AI 不直接：
 
-详见 `docs/AI_INTEGRATION.md` 和 `docs/V06_SYSTEMS.md`。
+- 修改 Go / JavaScript
+- 写存档 JSON
+- 自己生成骰子结果
+- 自己声明 NPC 已经移动
+- 自己宣告玩家得到物品
+- 自己决定不存在的世界事实
+
+详见 `docs/AI_INTEGRATION.md` 与 `docs/V07_SYSTEMS.md`。

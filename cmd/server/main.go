@@ -23,6 +23,15 @@ func main() {
 	absData, _ := filepath.Abs(*data)
 	absWeb, _ := filepath.Abs(*web)
 	store := game.NewStore(absData)
+	if overrides, err := store.LoadContentOverrides(); err == nil {
+		for _, ov := range overrides {
+			if err := game.ApplyContentOverride(ov); err != nil {
+				log.Printf("skip editor override %s/%s: %v", ov.Kind, ov.ID, err)
+			}
+		}
+	} else {
+		log.Printf("load editor overrides: %v", err)
+	}
 	engine := game.NewEngine()
 	server := httpapi.New(engine, store, absWeb)
 	addr := fmt.Sprintf(":%d", *port)

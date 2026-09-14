@@ -28,10 +28,16 @@ func (s *Server) Handler() http.Handler { return logging(s.mux) }
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		jsonOut(w, 200, map[string]any{"ok": true, "name": "ashen-crown-dungeon"})
+		jsonOut(w, 200, map[string]any{"ok": true, "name": "ashen-crown-dungeon", "version": "0.7.0"})
 	})
 	s.mux.HandleFunc("GET /api/world", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, game.World()) })
 	s.mux.HandleFunc("GET /api/tools", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, 200, game.ToolDefinitions()) })
+	s.mux.HandleFunc("GET /api/editor/content", s.editorContent)
+	s.mux.HandleFunc("GET /api/editor/overrides", s.editorOverrides)
+	s.mux.HandleFunc("GET /api/editor/runs", s.editorRuns)
+	s.mux.HandleFunc("POST /api/editor/content", s.editorSaveContent)
+	s.mux.HandleFunc("POST /api/editor/runs/{id}/world", s.editorWorld)
+	s.mux.HandleFunc("POST /api/editor/runs/{id}/room", s.editorRoom)
 	s.mux.HandleFunc("GET /api/saves", s.listSaves)
 	s.mux.HandleFunc("POST /api/saves/{id}/load", s.loadSave)
 	s.mux.HandleFunc("POST /api/runs", s.createRun)
@@ -49,6 +55,90 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/runs/{id}/save", s.manualSave)
 	s.mux.HandleFunc("POST /api/runs/{id}/tools/execute", s.executeTool)
 	s.mux.Handle("GET /", spaHandler(s.webDir))
+}
+
+func (s *Server) editorContent(w http.ResponseWriter, r *http.Request) {
+	jsonOut(w, 200, map[string]any{"content": game.EditorContent(), "kinds": game.SortedEditorKinds(), "version": "0.7.0"})
+}
+
+func (s *Server) editorRuns(w http.ResponseWriter, r *http.Request) {
+	runs, err := s.store.ListRuns()
+	if err != nil {
+		errOut(w, 500, err.Error())
+		return
+	}
+	jsonOut(w, 200, runs)
+}
+
+func (s *Server) editorOverrides(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.LoadContentOverrides()
+	if err != nil {
+		errOut(w, 500, err.Error())
+		return
+	}
+	jsonOut(w, 200, items)
+}
+
+func (s *Server) editorSaveContent(w http.ResponseWriter, r *http.Request) {
+	var in game.ContentOverride
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		errOut(w, 400, "请求格式错误")
+		return
+	}
+	if err := game.ApplyContentOverride(in); err != nil {
+		errOut(w, 400, err.Error())
+		return
+	}
+	if err := s.store.UpsertContentOverride(in); err != nil {
+		errOut(w, 500, err.Error())
+		return
+	}
+	jsonOut(w, 200, map[string]any{"ok": true, "kind": in.Kind, "id": in.ID})
+}
+
+func (s *Server) editorWorld(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			Action    string `json:"action"`
+			NPCID     string `json:"npcId"`
+			RoomID    string `json:"roomId"`
+			Region    string `json:"region"`
+			Value     string `json:"value"`
+			Flag      string `json:"flag"`
+			BoolValue bool   `json:"boolValue"`
+			EventID   string `json:"eventId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		switch in.Action {
+		case "move_npc":
+			return s.engine.GMMoveNPC(run, in.NPCID, in.RoomID)
+		case "set_region":
+			return s.engine.GMSetRegion(run, in.Region, in.Value)
+		case "set_flag":
+			return s.engine.GMSetFlag(run, in.Flag, in.BoolValue)
+		case "trigger_event":
+			return s.engine.GMTriggerWorldEvent(run, in.EventID)
+		case "advance_bell":
+			return s.engine.GMAdvanceBell(run)
+		default:
+			return fmt.Errorf("未知 GM 世界操作")
+		}
+	})
+}
+
+func (s *Server) editorRoom(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			Room      game.Room `json:"room"`
+			ConnectTo string    `json:"connectTo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		return s.engine.GMUpsertRoom(run, in.Room, in.ConnectTo)
+	})
 }
 
 func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
@@ -308,6 +398,10 @@ func spaHandler(root string) http.Handler {
 		}
 		if clean == "/" {
 			http.ServeFile(w, r, path.Join(root, "index.html"))
+			return
+		}
+		if clean == "/editor" {
+			http.ServeFile(w, r, path.Join(root, "editor.html"))
 			return
 		}
 		filePath := path.Join(root, clean)

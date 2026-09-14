@@ -151,6 +151,7 @@ func (e *Engine) advanceClock(run *Run) {
 	}
 	e.log(run, "world", run.Clock.LastChange)
 	e.onBellChanged(run)
+	e.onBellChangedV07(run)
 }
 
 func statusStacks(statuses []StatusState, id string) int {

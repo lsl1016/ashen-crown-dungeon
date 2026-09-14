@@ -70,7 +70,7 @@ async function createGame(){
     const seedRaw=$('#seedInput').value.trim();
     const seed=seedRaw?Number(seedRaw):Math.floor(Date.now()/1000);
     const snap=await api('/api/runs',{method:'POST',body:JSON.stringify({name,class:state.selectedClass,seed})});
-    startSnapshot(snap); toast('V0.6 世界已建立 · 动态世界与站位战斗已启用'); sfx('start');
+    startSnapshot(snap); toast('V0.7 Living World 已建立 · 世界事件调度已启用'); sfx('start');
   }catch(e){toast(e.message)}finally{state.busy=false}
 }
 function startSnapshot(snap){
@@ -90,7 +90,7 @@ function render(){
   setBar('#hpBar',p.hp,p.maxHp); setBar('#energyBar',p.energy,p.maxEnergy); const xpNeed=p.level*40; setBar('#xpBar',p.xp,xpNeed);
   $('#hpText').textContent=`${p.hp} / ${p.maxHp}`; $('#energyText').textContent=`${p.energy} / ${p.maxEnergy}`; $('#xpText').textContent=`${p.xp} / ${xpNeed}`; $('#goldLabel').textContent=p.gold;
   $('#statsGrid').innerHTML=[['力量',p.attributes.strength],['敏捷',p.attributes.dexterity],['感知',p.attributes.perception],['意志',p.attributes.will],['防御',p.defense],['成长点',(p.attributePoints||0)+(p.masteryPoints||0)+(p.talentPoints||0)]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
-  renderEquipment(items,p); renderInventory(items,p); renderScene(room,run); renderStory(run); renderContext(run,room); renderActions(run,room); renderMap(run); renderNearby(run); renderQuests(run); renderProverb(run); renderWorldPulse(run);
+  renderEquipment(items,p); renderInventory(items,p); renderScene(room,run); renderStory(run); renderContext(run,room); renderActions(run,room); renderMap(run); renderNearby(run); renderQuests(run); renderProverb(run); renderWorldPulse(run); renderWorldEvents(run);
 }
 function setBar(sel,v,max){ const el=$(sel); if(el)el.style.width=`${Math.max(0,Math.min(100,max?((v/max)*100):0))}%`; }
 
@@ -132,9 +132,9 @@ function elementState(run,room,el){
 }
 
 function renderScene(room,run){
-  const scene=$('#scene'); scene.className=`scene scene-${room.scene} threat-${Math.min(4,run.clock?.threat||0)} zone-${room.id>='room_33'?'waste':'tomb'}`;
+  const scene=$('#scene'), sceneState=run.sceneStates?.[room.id]||{}; scene.className=`scene scene-${room.scene} threat-${Math.min(4,run.clock?.threat||0)} zone-${room.id>='room_33'?'waste':'tomb'} world-${sceneState.kind||'stable'}`;
   renderEnvironment(room,run); renderPlayerActor(room,run); renderSceneNPCs(room,run); renderDialoguePanel(run); renderShopPanel(run);
-  $('#zoneLabel').textContent=room.zone||'墓城'; $('#regionStateLabel').textContent=run.regionStates?.[room.zone]||'状态未知'; $('#roomTypeLabel').textContent=run.activeEvent?run.activeEvent.title:(typeNames[room.type]||room.type);
+  $('#zoneLabel').textContent=room.zone||'墓城'; $('#regionStateLabel').textContent=sceneState.label?`${sceneState.label} · ${run.regionStates?.[room.zone]||'状态未知'}`:(run.regionStates?.[room.zone]||'状态未知'); $('#roomTypeLabel').textContent=run.activeEvent?run.activeEvent.title:(typeNames[room.type]||room.type);
   $('#roomTitle').textContent=room.name; $('#roomDescription').textContent=run.activeEvent?run.activeEvent.description:room.description;
   const eventCard=$('#eventCard');
   if(run.activeEvent){ eventCard.classList.remove('hidden'); $('#eventTitle').textContent=run.activeEvent.title; $('#eventDescription').textContent=run.activeEvent.description; } else eventCard.classList.add('hidden');
@@ -158,6 +158,7 @@ function renderScene(room,run){
     $('#enemyHpText').textContent=`${Math.max(0,run.combat.enemyHp)} / ${run.combat.enemyMaxHp}`; setBar('#enemyHpBar',Math.max(0,run.combat.enemyHp),run.combat.enemyMaxHp);
     $('#intentIcon').textContent=intent.icon||'⚔'; $('#intentLabel').textContent=intent.label||'未知意图'; $('#intentDescription').textContent=`${intent.description||''}${intent.telegraph?` · ${intent.telegraph}`:''}`;
     $('#enemyStatuses').innerHTML=(run.combat.enemyStatuses||[]).map(s=>`<span class="status-chip enemy">${escapeHtml(s.name)} ${s.rounds}</span>`).join('') || '<span class="status-empty">无异常状态</span>';
+    const terrainNames={open:'开阔战场',broken_cover:'断柱掩体',blackwater:'黑水带',cold_forge:'冷炉裂口',ashstorm:'灰暴战场'}; $('#terrainLabel').textContent=terrainNames[run.combat.terrain]||run.combat.terrain||'开阔战场'; $('#terrainHint').textContent=run.combat.terrainHint||'没有额外地形修正。'; $('#terrainCard').classList.toggle('hazard',!!(run.combat.hazards||[]).length);
     const phase=$('#bossPhase'); if(enemy?.boss){phase.classList.remove('hidden');phase.textContent=`PHASE ${roman(run.combat.bossPhase||1)}`}else phase.classList.add('hidden');
   } else es.classList.add('hidden');
 }
@@ -173,7 +174,7 @@ function renderContext(run,room){
   if(run.combat){
     const intent=run.combat.intent||{}; const ps=(run.combat.playerStatuses||[]).map(s=>`${s.name} ${s.rounds}`).join(' · ');
     const dn=['','近距','中距','远距'][Math.max(1,Math.min(3,run.combat.distance||2))];
-    box.innerHTML=`<span class="context-chip distance">◎ ${dn}</span><span class="context-chip intent">${intent.icon||'⚔'} 下一步：${escapeHtml(intent.label||'未知')}</span><span class="context-chip">${escapeHtml(intent.telegraph||'观察敌人动作决定应对方式')}</span>${ps?`<span class="context-chip debuff">自身状态：${escapeHtml(ps)}</span>`:''}`; return;
+    const hazards=(run.combat.hazards||[]).filter(h=>h.distance===run.combat.distance); box.innerHTML=`<span class="context-chip distance">◎ ${dn}</span><span class="context-chip intent">${intent.icon||'⚔'} 下一步：${escapeHtml(intent.label||'未知')}</span><span class="context-chip">${escapeHtml(run.combat.terrainHint||intent.telegraph||'观察敌人动作决定应对方式')}</span>${hazards.length?`<span class="context-chip debuff">⚠ 当前危险：${escapeHtml(hazards.map(h=>h.label).join(' / '))}</span>`:''}${ps?`<span class="context-chip debuff">自身状态：${escapeHtml(ps)}</span>`:''}`; return;
   }
   if(run.activeEvent){box.innerHTML=`<span class="context-chip">◈ ${escapeHtml(run.activeEvent.title)}</span><span class="context-chip">选择会永久写入本次世界状态</span>`;return;}
   const els=(room.elements||[]).map(el=>({el,st:elementState(run,room,el)})).filter(x=>x.st.visible);
@@ -195,10 +196,11 @@ function renderActions(run,room){
   }
   if(run.activeShop){box.innerHTML=`<button class="action-btn primary" data-shop-tab="buy">购买</button><button class="action-btn" data-shop-tab="sell">出售</button><button class="action-btn ghost" data-shop-close>结束交易</button><span class="action-hint">古金币 ${run.player.gold} · 关键剧情物品不可出售</span>`;$$('[data-shop-tab]').forEach(b=>b.onclick=()=>{state.shopTab=b.dataset.shopTab;renderShopPanel(run)});$('[data-shop-close]').onclick=closeShop;return;}
   if(run.combat){
-    const cls=state.world.classes.find(c=>c.id===run.player.class), skill=cls?.skillName||'职业技', cd=run.combat.cooldowns?.skill||0, skillCost=(run.player.growth?.signature_mastery||0)>=3?2:3;
-    const potion=countItem(run,'healing_draught');
-    const dist=Math.max(1,Math.min(3,run.combat.distance||2)), dn=['','近距','中距','远距'][dist];
-    box.innerHTML=`<button class="action-btn primary" data-combat="attack" data-hotkey="1"><kbd>1</kbd>⚔ 普通攻击</button><button class="action-btn" data-combat="skill" data-hotkey="2" ${cd>0||run.player.energy<skillCost?'disabled':''} title="${escapeHtml(cls?.skillDescription||'')}"><kbd>2</kbd>✦ ${escapeHtml(skill)} ${cd>0?`· 冷却 ${cd}`:`· ${skillCost} 能量`}</button><button class="action-btn" data-combat="guard" data-hotkey="3"><kbd>3</kbd>⛨ 防御</button><button class="action-btn position" data-combat="advance" data-hotkey="4" ${dist<=1?'disabled':''}><kbd>4</kbd>→ 推进</button><button class="action-btn position" data-combat="retreat" data-hotkey="5" ${dist>=3?'disabled':''}><kbd>5</kbd>← 后撤</button><button class="action-btn" data-combat="potion" data-hotkey="6" ${potion<=0?'disabled':''}><kbd>6</kbd>🧪 药剂 ×${potion}</button><button class="action-btn danger" data-combat="flee" data-hotkey="7"><kbd>7</kbd>↶ 脱离战斗</button><span class="action-hint">ROUND ${run.combat.round+1} · 当前 ${dn} · 站位会影响命中、伤害与敌人行为</span>`;
+    const skills=(run.player.skills||[]).map(id=>state.world.skills?.[id]).filter(Boolean), potion=countItem(run,'healing_draught');
+    const dist=Math.max(1,Math.min(3,run.combat.distance||2)), dn=['','近距','中距','远距'][dist]; let key=2;
+    const skillButtons=skills.map(sk=>{const cd=run.combat.cooldowns?.[`skill:${sk.id}`]||0, baseCost=sk.cost||0, cost=(sk.id===(run.player.class==='warden'?'warden_smite':run.player.class==='ranger'?'ranger_pierce':'seer_burst')&&(run.player.growth?.signature_mastery||0)>=3)?Math.max(1,baseCost-1):baseCost, rangeLock=dist<(sk.minDistance||1)||(sk.maxDistance&&dist>sk.maxDistance);const hk=key++;return `<button class="action-btn skill-action" data-combat="skill:${sk.id}" data-hotkey="${hk}" ${cd>0||run.player.energy<cost||rangeLock?'disabled':''} title="${escapeHtml(sk.description||'')}"><kbd>${hk}</kbd>${sk.icon||'✦'} ${escapeHtml(sk.name)} ${cd>0?`· 冷却 ${cd}`:rangeLock?'· 距离不符':`· ${cost} 能量`}</button>`}).join('');
+    const guardKey=key++,advKey=key++,retKey=key++,potKey=key++,fleeKey=key++;
+    box.innerHTML=`<button class="action-btn primary" data-combat="attack" data-hotkey="1"><kbd>1</kbd>⚔ 普通攻击</button>${skillButtons}<button class="action-btn" data-combat="guard" data-hotkey="${guardKey}"><kbd>${guardKey}</kbd>⛨ 防御</button><button class="action-btn position" data-combat="advance" data-hotkey="${advKey}" ${dist<=1?'disabled':''}><kbd>${advKey}</kbd>→ 推进</button><button class="action-btn position" data-combat="retreat" data-hotkey="${retKey}" ${dist>=3?'disabled':''}><kbd>${retKey}</kbd>← 后撤</button><button class="action-btn" data-combat="potion" data-hotkey="${potKey}" ${potion<=0?'disabled':''}><kbd>${potKey}</kbd>🧪 药剂 ×${potion}</button><button class="action-btn danger" data-combat="flee" data-hotkey="${fleeKey}"><kbd>${fleeKey}</kbd>↶ 脱离战斗</button><span class="action-hint">ROUND ${run.combat.round+1} · ${dn} · ${escapeHtml(run.combat.terrainHint||'')}</span>`;
     $$('[data-combat]').forEach(b=>b.onclick=()=>combatAction(b.dataset.combat)); return;
   }
   if(run.activeEvent){
@@ -219,11 +221,11 @@ function renderActions(run,room){
     if(r.locked){html+=`<button class="action-btn locked" disabled>🔒 ${escapeHtml(r.visited?r.name:(typeNames[r.type]||'未知道路'))}</button>`;continue;}
     html+=`<button class="action-btn travel" data-move="${r.id}" data-hotkey="${hotkey}"><kbd>${hotkey++}</kbd>→ 前往 ${escapeHtml(r.visited?r.name:(typeNames[r.type]||'未知地点'))}</button>`;
   }
-  html+=`<span class="action-hint">V0.6 · NPC 日程、区域状态、任务后果与商店刷新都由 Run 持久化驱动</span>`; box.innerHTML=html;
+  html+=`<span class="action-hint">V0.7 · 世界事件、NPC 日程、任务分支、场景状态都由 Run 持久化驱动</span>`; box.innerHTML=html;
   $$('[data-action-interact]').forEach(b=>b.onclick=()=>interact(b.dataset.actionInteract)); $$('[data-dynamic-action-npc]').forEach(b=>b.onclick=()=>startNPCDialogue(b.dataset.dynamicActionNpc)); $$('[data-move]').forEach(b=>b.onclick=()=>moveTo(b.dataset.move));
 }
 async function chooseEvent(id){ sfx('interact'); await perform(`/api/runs/${state.runId}/action`,{choiceId:id},true,'event'); }
-async function combatAction(action){ if(action==='skill')actorEmote('cast');else if(action==='guard')actorEmote('guard');else if(action==='attack')actorEmote('attack');else if(action==='advance'||action==='retreat')actorEmote('idle'); sfx(action==='skill'?'skill':action==='guard'?'guard':action==='advance'||action==='retreat'?'move':'attack'); await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
+async function combatAction(action){ if(action.startsWith('skill'))actorEmote('cast');else if(action==='guard')actorEmote('guard');else if(action==='attack')actorEmote('attack');else if(action==='advance'||action==='retreat')actorEmote('idle'); sfx(action.startsWith('skill')?'skill':action==='guard'?'guard':action==='advance'||action==='retreat'?'move':'attack'); await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
 async function itemAction(itemId,action){ sfx(action==='equip'?'equip':'item'); await perform(`/api/runs/${state.runId}/item`,{itemId,action},false,'item'); }
 async function interact(elementId){
   const run=state.snapshot.run, room=run.rooms[run.currentRoomId], el=(room.elements||[]).find(x=>x.id===elementId);
@@ -246,7 +248,7 @@ async function perform(url,payload,showDice,kind){
     if(oldCombat&&now.combat&&oldCombat.distance!==now.combat.distance){const d=now.combat.distance||2;setActorPosition(d===1?42:d===2?28:16,74,true);spawnFloat('player',d===1?'近距':d===2?'中距':'远距','energy');}
     if(oldEnemyHP!=null){
       const nextEnemyHP=now.combat?.enemyHp ?? 0, delta=Math.max(0,oldEnemyHP-nextEnemyHP);
-      if(delta>0){pulseClass('#scene','scene-hit',500);spawnFloat('enemy',`-${delta}`,now.lastRoll?.critical?'crit':'damage');if(kind==='combat'&&payload.action==='skill')spawnSkillVfx(now.player.class);else spawnVfx(kind==='combat'?'slash':'burst','enemy');sfx(now.lastRoll?.critical?'crit':'hit');}
+      if(delta>0){pulseClass('#scene','scene-hit',500);spawnFloat('enemy',`-${delta}`,now.lastRoll?.critical?'crit':'damage');if(kind==='combat'&&String(payload.action||'').startsWith('skill'))spawnSkillVfx(now.player.class);else spawnVfx(kind==='combat'?'slash':'burst','enemy');sfx(now.lastRoll?.critical?'crit':'hit');}
     }
     if(oldHP!=null&&now.player.hp<oldHP){const d=oldHP-now.player.hp;pulseClass('#scene','screen-shake',360);enemyEmote();actorEmote('hit');spawnFloat('player',`-${d}`,'damage');sfx('hurt');}
     if(oldHP!=null&&now.player.hp>oldHP){spawnFloat('player',`+${now.player.hp-oldHP}`,'heal');sfx('heal');}
@@ -297,6 +299,10 @@ function renderQuests(run){
 function renderWorldPulse(run){
   const c=run.clock||{bell:1,threat:0,lastChange:'第一声钟已经结束。'}, room=run.rooms[run.currentRoomId], rs=run.regionStates?.[room.zone]||'状态未知';$('#worldThreat').textContent=`威胁 ${c.threat||0} · 第 ${c.bell||1} 钟 · ${rs}`;$('#worldChange').textContent=c.lastChange||'墓城暂时保持沉默。';
 }
+function renderWorldEvents(run){
+  const box=$('#worldEventList'); if(!box)return; const events=Object.values(run.worldEvents||{}).sort((a,b)=>(b.severity||0)-(a.severity||0));
+  box.innerHTML=events.length?events.map(ev=>`<article class="world-event ${escapeHtml(ev.status||'active')} severity-${ev.severity||1}"><div><b>${ev.status==='resolved'?'✓':'◈'} ${escapeHtml(ev.title)}</b><span>${escapeHtml(ev.region)} · ${ev.stage==='escalated'?'恶化':ev.status==='resolved'?'已结束':'发展中'}</span></div><p>${escapeHtml(ev.description||'')}</p></article>`).join(''):'<p class="muted" style="font-size:9px">当前没有活跃的世界事件。</p>';
+}
 function renderProverb(run){
   let t='“王冠不是王权。它是门闩。”';if(run.flags.opened_outer_gate)t='“门不是为了阻止我们出去，而是阻止它进来。”';else if(run.flags.act2_unlocked)t='“墓城只是一枚钉子。灰风之外，还有真正的门。”';else if(run.flags.knows_last_price)t='“第十三种代价不是死亡，而是遗忘为何不肯死。”';else if(run.flags.heard_true_name)t='“真名不会打开门。真名会让守门的人醒来。”';else if(run.flags.saw_false_crown)t='“你看见的王冠，只是封印希望你看见的形状。”';$('#proverbText').textContent=t;
 }
@@ -307,7 +313,7 @@ async function openSaves(){
 }
 function openJournal(){if(!state.snapshot)return;const run=state.snapshot.run;showModal(`<h2>冒险日志</h2><div class="log-list">${run.log.slice().reverse().map(l=>`<div><b>#${l.turn}</b> <span style="color:#777">[${escapeHtml(l.type)}]</span> ${escapeHtml(l.message)}</div>`).join('')}</div>`)}
 function openCodex(){if(!state.snapshot)return;const lore=state.snapshot.run.lore||[];showModal(`<h2>发现档案 <small style="font-size:10px;color:#696f76">${lore.length} 条</small></h2><div class="codex-list">${lore.length?lore.map(x=>`<article class="codex-item"><b>${escapeHtml(x.title)}</b><p>${escapeHtml(x.text)}</p></article>`).join(''):'<p class="muted">还没有发现任何档案。调查碑文、病历、判决、笔记与遗物可以解锁。</p>'}</div>`)}
-function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.6 在双幕 44 地点战役上加入 NPC 日程迁移、区域状态演化、任务阶段/结局、商店钟声刷新、站位战斗、装备随机词条和三级职业技能树。</p>${state.snapshot?`<h3 style="margin-top:14px">当前区域状态</h3><div class="region-state-grid">${Object.entries(state.snapshot.run.regionStates||{}).map(([z,v])=>{const cl=/重建|回响|掌握|停止/.test(v)?'safe':/高危|暴增|破口|脉动|封闭/.test(v)?'danger':'';return `<div class="region-state-card ${cl}"><b>${escapeHtml(z)}</b><span>${escapeHtml(v)}</span></div>`}).join('')}</div>`:''}</div>`)}
+function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.7 Living World 在双幕战役上加入世界事件调度、NPC 日程状态、任务图分支、数据驱动技能/效果、动态场景状态、战场地形，以及可持久化内容覆盖的 GM 编辑器。</p>${state.snapshot?`<h3 style="margin-top:14px">当前区域状态</h3><div class="region-state-grid">${Object.entries(state.snapshot.run.regionStates||{}).map(([z,v])=>{const cl=/重建|回响|掌握|停止/.test(v)?'safe':/高危|暴增|破口|脉动|封闭/.test(v)?'danger':'';return `<div class="region-state-card ${cl}"><b>${escapeHtml(z)}</b><span>${escapeHtml(v)}</span></div>`}).join('')}</div>`:''}</div>`)}
 function openGrowth(){
   if(!state.snapshot)return; const run=state.snapshot.run,p=run.player,cls=state.world.classes.find(c=>c.id===p.class); const talents=(state.world.talents||[]).filter(t=>t.class===p.class); const growth=state.world.growth||[];
   const attrCards=Object.entries(attrNames).map(([id,name])=>`<article class="growth-card attribute"><span>${name}</span><b>${p.attributes[id]}</b><button class="mini-btn" data-grow-attr="${id}" ${(p.attributePoints||0)<=0?'disabled':''}>+1</button></article>`).join('');
@@ -358,17 +364,17 @@ async function showCinematic(kicker,title,text,kind='',duration=1000){
   const o=$('#cinematicOverlay');if(!o)return;o.className=`cinematic-overlay show ${kind}`;$('#cinematicKicker').textContent=kicker;$('#cinematicTitle').textContent=title;$('#cinematicText').textContent=text||'';o.classList.remove('hidden');await new Promise(r=>setTimeout(r,duration));o.classList.add('hidden');o.classList.remove('show','boss','final');
 }
 function renderEnvironment(room,run){
-  const waste=Number(room.id.split('_')[1]||0)>=33; const threat=run.clock?.threat||0, regionState=run.regionStates?.[room.zone]||'';
+  const waste=Number(room.id.split('_')[1]||0)>=33; const threat=run.clock?.threat||0, regionState=run.regionStates?.[room.zone]||'', sceneState=run.sceneStates?.[room.id]||{};
   const rear=$('#envRear'),mid=$('#envMid'),front=$('#envFront'); if(!rear||!mid||!front)return;
   rear.innerHTML=`<i class="env-orb one"></i><i class="env-orb two"></i>`;
   mid.innerHTML=Array.from({length:waste?7:5},(_,i)=>`<i class="env-particle p${i%4}"></i>`).join('');
-  front.innerHTML=`<i class="env-sweep ${waste?'wind':'ash'}"></i>${threat>=2?'<i class="env-sweep omen"></i>':''}${/安全|建立|掌握/.test(regionState)?'<i class="env-sweep safe"></i>':''}${/暴增|高危|破口/.test(regionState)?'<i class="env-sweep danger"></i>':''}`;
+  front.innerHTML=`<i class="env-sweep ${waste?'wind':'ash'}"></i>${threat>=2?'<i class="env-sweep omen"></i>':''}${/安全|建立|掌握/.test(regionState)||sceneState.kind==='secured'?'<i class="env-sweep safe"></i>':''}${/暴增|高危|破口/.test(regionState)||['danger','plague','blackfire','storm','echo'].includes(sceneState.kind)?`<i class="env-sweep danger ${escapeHtml(sceneState.kind||'')}"></i>`:''}`;
 }
 function renderSceneNPCs(room,run){
   const stage=$('#npcStage'); if(!stage)return; const can=!run.combat&&!run.activeEvent&&!run.activeDialogue&&!run.activeShop&&!run.gameOver;
   const ids=Object.entries(run.npcLocations||{}).filter(([,rid])=>rid===room.id).map(([id])=>id);
   const fixed=(room.elements||[]).filter(el=>el.action==='dialogue'&&state.world.npcs?.[el.target]); const byId=Object.fromEntries(fixed.map(el=>[el.target,el]));
-  stage.innerHTML=ids.map((id,i)=>{const npc=state.world.npcs?.[id];if(!npc)return '';const base=byId[id],x=base?.x??(38+i*18),y=Math.max(23,(base?.y??48)-8),rel=run.npcRelations?.[npc.id]||0;return `<button class="scene-npc ${can?'':'disabled'}" style="left:${x}%;top:${y}%;--npc-delay:${i*.12}s" ${can?`data-dynamic-npc="${id}"`:''}><img src="${npc.portrait}" alt="${escapeHtml(npc.name)}"><span><b>${escapeHtml(npc.name)}</b><small>${escapeHtml(npc.title)} · ${relationshipText(rel)}</small></span></button>`}).join('');
+  stage.innerHTML=ids.map((id,i)=>{const npc=state.world.npcs?.[id];if(!npc)return '';const base=byId[id],x=base?.x??(38+i*18),y=Math.max(23,(base?.y??48)-8),rel=run.npcRelations?.[npc.id]||0;return `<button class="scene-npc ${can?'':'disabled'}" style="left:${x}%;top:${y}%;--npc-delay:${i*.12}s" ${can?`data-dynamic-npc="${id}"`:''}><img src="${npc.portrait}" alt="${escapeHtml(npc.name)}"><span><b>${escapeHtml(npc.name)}</b><small>${escapeHtml(npc.title)} · ${relationshipText(rel)}<br>${escapeHtml(run.npcWorld?.[id]?.activity||'')}</small></span></button>`}).join('');
   $$('[data-dynamic-npc]').forEach(b=>b.onclick=()=>startNPCDialogue(b.dataset.dynamicNpc));
 }
 async function startNPCDialogue(npcId){if(state.busy)return;sfx('interact');await perform(`/api/runs/${state.runId}/npc`,{npcId},false,'dialogue');}

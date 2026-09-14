@@ -97,38 +97,47 @@ func (e *Engine) syncRegionStates(run *Run) {
 }
 
 func desiredNPCLocation(run *Run, npcID string) string {
+	// Plot consequences override ordinary daily schedules.
 	switch npcID {
 	case "iven":
 		if run.Flags["lost_patrol_reported"] {
 			return "room_01"
 		}
-		if run.Clock.Bell >= 7 {
-			return "room_25" // 灰疫医馆，后半程帮助处理巡夜伤员。
-		}
-		return "room_13"
-	case "veil_broker":
-		if run.Flags["act2_unlocked"] && run.Clock.Bell >= 8 {
-			return "room_33" // 墓城开放后，商人把生意搬到雾外界碑。
-		}
-		return "room_14"
 	case "nameless_prisoner":
 		if run.Flags["prisoner_freed"] {
 			return "room_13"
 		}
-		return "room_07"
 	case "orrin":
 		if run.Flags["orrin_oath"] || run.Flags["opened_outer_gate"] {
 			return "room_43"
 		}
-		return "room_41"
 	case "mara":
 		if run.Flags["mara_hunt_reported"] {
 			return "room_33"
 		}
-		return "room_42"
-	default:
-		return ""
 	}
+
+	// V0.7 schedules are actual movement data, not just descriptive metadata.
+	if schedule, ok := NPCSchedules[npcID]; ok {
+		bell := max(1, run.Clock.Bell)
+		to := ""
+		for _, row := range schedule.Entries {
+			if bell < row.FromBell || bell > row.ToBell {
+				continue
+			}
+			if row.RequireFlag != "" && !run.Flags[row.RequireFlag] {
+				continue
+			}
+			if run.Rooms[row.RoomID] != nil {
+				to = row.RoomID // later matching rows can specialize an earlier fallback row
+			}
+		}
+		if to != "" {
+			return to
+		}
+	}
+
+	return initialNPCLocations()[npcID]
 }
 
 func (e *Engine) syncNPCLocations(run *Run, logMoves bool) {
@@ -142,6 +151,9 @@ func (e *Engine) syncNPCLocations(run *Run, logMoves bool) {
 	sort.Strings(ids)
 	for _, id := range ids {
 		to := desiredNPCLocation(run, id)
+		if manual := run.NPCOverrides[id]; manual != "" && run.Rooms[manual] != nil {
+			to = manual
+		}
 		if to == "" {
 			continue
 		}
@@ -163,21 +175,21 @@ func (e *Engine) syncNPCLocations(run *Run, logMoves bool) {
 func (e *Engine) dialogueStartNode(run *Run, npcID, fallback string) string {
 	switch npcID {
 	case "iven":
-		if run.Flags["lost_patrol_reported"] {
+		if run.Flags["lost_patrol_reported"] || run.Flags["lost_patrol_sealed"] {
 			return "after"
 		}
 		if q := run.Quests["lost_patrol"]; q != nil && q.Status == "completed" {
 			return "return"
 		}
 	case "nameless_prisoner":
-		if run.Flags["prisoner_freed"] {
+		if run.Flags["prisoner_freed"] || run.Flags["prisoner_name_bound"] {
 			return "after"
 		}
 		if q := run.Quests["nameless_prisoner"]; q != nil && q.Status == "completed" {
 			return "return"
 		}
 	case "mara":
-		if run.Flags["mara_hunt_reported"] {
+		if run.Flags["mara_hunt_reported"] || run.Flags["mara_route_withheld"] {
 			return "after"
 		}
 		if q := run.Quests["storm_hunt"]; q != nil && q.Status == "completed" {
@@ -345,7 +357,7 @@ func (e *Engine) Prepare(run *Run) {
 	if run == nil {
 		return
 	}
-	e.ensureV06State(run)
+	e.ensureV07State(run)
 	if run.Combat != nil && run.Combat.Distance <= 0 {
 		run.Combat.Distance = startingDistance(run.Player.Class)
 	}

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0-living-world-editor
+
+V0.7 把 V0.6 的持续状态推进成可调度、可分支、可编辑的 Living World Runtime。
+
+- 新增 4 个结构化世界事件：灰疫潮、无名游行、王庭猎名、灰暴锋线；支持触发、升级、解决和场景 Overlay。
+- 新增 `NPCScheduleDef / NPCWorldState`，5 个 NPC 拥有钟声日程、行为、健康、心情和知识状态。
+- 三条支线升级为 QuestGraph，均拥有两个真实结局，并通过 `questDecisions` 持久化。
+- 修复替代支线结局完成后再次对话可能重复领取奖励的问题。
+- 新增 6 个 `SkillDef` 数据驱动技能，战斗支持 `skill:<id>`；技能 Cost、CD、Range、Effect 均来自内容定义。
+- 战斗新增 Battlefield Terrain 与 Hazard；桥梁掩体、黑水、冷炉、灰暴及 Living World Event 均会影响回合。
+- 新增 `SceneState`，区域与世界事件可以直接改变场景环境表现。
+- 新增本地 `/editor` GM Editor：内容库、覆盖持久化、Run 选择、世界事件、NPC 移动、区域 / Flag 修改、Room 创建与连接、实时小地图。
+- 新增内容覆盖文件 `data/editor/content_overrides.json`，重启服务后自动加载。
+- 新增 GM / AI 持久 Override：`npcOverrides` 与 `regionOverrides`，避免手动世界修改被自动日程覆盖。
+- Tool Boundary 新增 `move_npc`、`set_region_state`、`trigger_world_event`。
+- 新增 V0.7 自动测试：世界事件生命周期、Quest 分支防重复领奖、数据技能、地形、旧存档补齐、GM 世界操作、内容覆盖。
+- 仍未接入任何 LLM。
+
 ## 0.6.0-persistent-world-tactics
 
 V0.6 从“RPG 交互完整”继续推进到“世界状态会持续演化”。

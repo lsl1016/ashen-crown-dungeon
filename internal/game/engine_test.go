@@ -1,6 +1,9 @@
 package game
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestDeterministicDungeon(t *testing.T) {
 	a, ae := GenerateDungeon(42)
@@ -586,5 +589,180 @@ func TestV06PrepareNormalizesOldSave(t *testing.T) {
 	e.Prepare(r)
 	if len(r.NPCLocations) == 0 || len(r.RegionStates) == 0 || len(r.ShopRefresh) == 0 || r.ItemAffixes == nil {
 		t.Fatal("Prepare should normalize all V0.6 persistent maps")
+	}
+}
+
+func TestV07WorldEventLifecycleAndSceneOverlay(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Bellkeeper", "warden", 7071)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Clock.Bell = 4
+	e.ensureV07State(r)
+	st := r.WorldEvents["grey_plague_tide"]
+	if st == nil || st.Status != "active" || st.Stage != "emerging" {
+		t.Fatalf("grey plague should emerge at bell 4: %+v", st)
+	}
+	if scene := r.SceneStates["room_01"]; scene == nil || scene.Kind != "plague" {
+		t.Fatalf("outer tomb scene should receive plague overlay: %+v", scene)
+	}
+	r.Clock.Bell = 7
+	e.onBellChangedV07(r)
+	if r.WorldEvents["grey_plague_tide"].Stage != "escalated" {
+		t.Fatalf("event should escalate at bell 7: %+v", r.WorldEvents["grey_plague_tide"])
+	}
+	r.Flags["lost_patrol_sealed"] = true
+	e.ensureV07State(r)
+	if r.WorldEvents["grey_plague_tide"].Status != "resolved" {
+		t.Fatalf("alternate quest ending must resolve event: %+v", r.WorldEvents["grey_plague_tide"])
+	}
+	if got := r.RegionStates["外墓区"]; got != "哨线维持 · 真相被封存" {
+		t.Fatalf("branch outcome should persist region state, got %q", got)
+	}
+}
+
+func TestV07BranchQuestCannotRepeatTurnIn(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Archivist", "ranger", 7072)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Quests["lost_patrol"] = &QuestState{ID: "lost_patrol", Title: "失踪的第三巡夜队", Status: "completed", Stage: "return", Progress: 1, Goal: 1}
+	r.CurrentRoomID = "room_13"
+	if err := e.StartDialogue(r, "iven"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.DialogueChoice(r, "seal"); err != nil {
+		t.Fatal(err)
+	}
+	e.Prepare(r)
+	if r.QuestDecisions["lost_patrol"] != "sealed" {
+		t.Fatalf("decision missing: %+v", r.QuestDecisions)
+	}
+	gold := r.Player.Gold
+	// Move Iven to wherever the living-world schedule places him and start again.
+	r.CurrentRoomID = r.NPCLocations["iven"]
+	if err := e.StartDialogue(r, "iven"); err != nil {
+		t.Fatal(err)
+	}
+	if r.ActiveDialogue == nil || r.ActiveDialogue.NodeID != "after" {
+		t.Fatalf("resolved alternate branch must start at after node: %+v", r.ActiveDialogue)
+	}
+	if r.Player.Gold != gold {
+		t.Fatal("reopening dialogue must not repeat reward")
+	}
+}
+
+func TestV07DataDrivenSkillAndTerrainHazard(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Chainbreaker", "warden", 7073)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.HP, r.Player.MaxHP = 999, 999
+	// Use a flooded room so the new battlefield hazard is deterministic.
+	r.Rooms["room_01"].Type = "flooded"
+	e.startCombat(r, "bone_thrall")
+	r.Combat.Distance = 3
+	r.Combat.Intent = EnemyIntent{ID: "defend", Kind: "defend", Label: "防御架势"}
+	if err := e.CombatAction(r, "skill:warden_chainbreaker"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Combat == nil {
+		t.Fatal("combat unexpectedly ended")
+	}
+	if r.Combat.Distance != 1 {
+		t.Fatalf("chainbreaker should close to near distance, got %d", r.Combat.Distance)
+	}
+	if r.Combat.Cooldowns["skill:warden_chainbreaker"] <= 0 {
+		t.Fatalf("data skill cooldown was not recorded: %+v", r.Combat.Cooldowns)
+	}
+	if r.Combat.Terrain != "blackwater" {
+		t.Fatalf("terrain should be blackwater, got %s", r.Combat.Terrain)
+	}
+}
+
+func TestV07PrepareBackfillsLivingWorldState(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Legacy07", "seer", 7074)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.Skills = nil
+	r.WorldEvents = nil
+	r.NPCWorld = nil
+	r.SceneStates = nil
+	r.QuestDecisions = nil
+	e.Prepare(r)
+	if len(r.Player.Skills) != 2 || r.WorldEvents == nil || len(r.NPCWorld) == 0 || len(r.SceneStates) == 0 || r.QuestDecisions == nil {
+		t.Fatalf("V0.7 state was not fully backfilled: skills=%v world=%v npc=%d scene=%d decisions=%v", r.Player.Skills, r.WorldEvents, len(r.NPCWorld), len(r.SceneStates), r.QuestDecisions)
+	}
+}
+
+func TestV07GMRoomAndWorldOperations(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("GM", "seer", 7075)
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := Room{ID: "gm_test_room", Name: "试验大厅", Type: "event", Scene: "hall", Zone: "GM 区域", X: 90, Y: 90, Description: "测试"}
+	if err := e.GMUpsertRoom(r, room, "room_01"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Rooms[room.ID] == nil || !e.adjacent(r, "room_01", room.ID) {
+		t.Fatal("GM room should be created and connected")
+	}
+	if err := e.GMSetRegion(r, "GM 区域", "正在重写"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.GMMoveNPC(r, "iven", room.ID); err != nil {
+		t.Fatal(err)
+	}
+	e.Prepare(r)
+	if r.NPCLocations["iven"] != room.ID || r.NPCOverrides["iven"] != room.ID {
+		t.Fatalf("GM move must survive Prepare: location=%s override=%s", r.NPCLocations["iven"], r.NPCOverrides["iven"])
+	}
+	if err := e.GMSetRegion(r, "外墓区", "GM 封锁"); err != nil {
+		t.Fatal(err)
+	}
+	e.Prepare(r)
+	if r.RegionStates["外墓区"] != "GM 封锁" {
+		t.Fatalf("GM region override must survive Prepare: %s", r.RegionStates["外墓区"])
+	}
+	if err := e.GMTriggerWorldEvent(r, "nameless_procession"); err != nil {
+		t.Fatal(err)
+	}
+	if r.WorldEvents["nameless_procession"] == nil || r.WorldEvents["nameless_procession"].Status != "active" {
+		t.Fatal("GM world event trigger failed")
+	}
+}
+
+func TestV07ContentOverrideSkill(t *testing.T) {
+	id := "test_editor_skill"
+	defer delete(Skills, id)
+	value := json.RawMessage(`{"class":"seer","name":"编辑器星火","icon":"*","cost":1,"cooldown":1,"minDistance":1,"maxDistance":3,"hitAttribute":"will","effects":[{"type":"damage","value":2,"dice":4}]}`)
+	if err := ApplyContentOverride(ContentOverride{Kind: "skills", ID: id, Value: value}); err != nil {
+		t.Fatal(err)
+	}
+	if got := Skills[id]; got.ID != id || got.Name != "编辑器星火" {
+		t.Fatalf("override not applied: %+v", got)
+	}
+}
+
+func TestV07NPCScheduleDefinitionDrivesMovement(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Scheduler", "ranger", 7076)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := NPCSchedules["iven"]
+	defer func() { NPCSchedules["iven"] = original }()
+	NPCSchedules["iven"] = NPCScheduleDef{NPCID: "iven", Entries: []NPCScheduleEntry{{FromBell: 1, ToBell: 13, RoomID: "room_02", Activity: "测试日程"}}}
+	delete(r.NPCOverrides, "iven")
+	e.syncNPCLocations(r, false)
+	e.syncNPCWorld(r)
+	if r.NPCLocations["iven"] != "room_02" || r.NPCWorld["iven"].Activity != "测试日程" {
+		t.Fatalf("schedule definition should drive movement and activity: loc=%s world=%+v", r.NPCLocations["iven"], r.NPCWorld["iven"])
 	}
 }

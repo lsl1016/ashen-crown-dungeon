@@ -37,7 +37,7 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 		Defense: class.Defense, Gold: 24, Attributes: class.Attributes,
 		Inventory: []string{class.StarterItem, "healing_draught", "bandage"},
 		Equipment: map[string]string{"weapon": class.StarterItem}, TalentPoints: 1, Talents: map[string]int{},
-		AttributePoints: 1, MasteryPoints: 1, Growth: map[string]int{},
+		AttributePoints: 1, MasteryPoints: 1, Growth: map[string]int{}, Skills: startingSkillsForClass(class.ID),
 	}
 	run := &Run{
 		ID:   fmt.Sprintf("run_%x", hash64(fmt.Sprintf("%d-%s-%d", seed, name, time.Now().UnixNano()))),
@@ -45,8 +45,9 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 		Player: player, Rooms: rooms, Edges: edges, CurrentRoomID: "room_01",
 		Flags: map[string]bool{}, Quests: map[string]*QuestState{}, Lore: []LoreEntry{}, Log: []LogEntry{},
 		Clock:        WorldClock{Bell: 1, Steps: 0, Threat: 0, LastChange: "第一声钟已经结束。墓城开始重新排列道路。"},
-		NPCRelations: map[string]int{}, NPCLocations: initialNPCLocations(), RegionStates: initialRegionStates(),
+		NPCRelations: map[string]int{}, NPCLocations: initialNPCLocations(), NPCOverrides: map[string]string{}, RegionStates: initialRegionStates(), RegionOverrides: map[string]string{},
 		ShopStock: initialShopStock(), ShopRefresh: initialShopRefresh(1), ItemAffixes: map[string][]AffixState{},
+		WorldEvents: map[string]*WorldEventState{}, NPCWorld: map[string]*NPCWorldState{}, SceneStates: map[string]*SceneState{}, QuestDecisions: map[string]string{},
 	}
 	// 每个职业都带一件能展示 V0.3 装备 Build 的起始副装备。
 	switch class.ID {
@@ -64,7 +65,7 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 	e.revealNeighbors(run, "room_01")
 	e.log(run, "story", "你进入了沉眠墓城。第一声钟鸣已经结束。场景中的物件、门、机关和道路现在都会真实改变世界状态。")
 	e.log(run, "level", "你拥有 1 点初始天赋点。可以从角色面板选择第一项 Build 能力。")
-	e.ensureV06State(run)
+	e.ensureV07State(run)
 	return run, nil
 }
 
@@ -194,6 +195,11 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 	run.LastRoll = nil
 	messages := []string{}
 	interrupted := false
+	requestedSkill := ""
+	if strings.HasPrefix(action, "skill:") {
+		requestedSkill = strings.TrimPrefix(action, "skill:")
+		action = "data_skill"
+	}
 
 	// 上一轮敌人的防御姿态只影响本轮玩家行动。
 	enemyDefense := combat.EnemyDefense
@@ -253,86 +259,15 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 		} else {
 			messages = append(messages, "你的攻击擦过敌人的防御。")
 		}
-	case "skill":
-		if combat.Cooldowns["skill"] > 0 {
-			return fmt.Errorf("职业技还需要 %d 回合冷却", combat.Cooldowns["skill"])
+	case "skill", "data_skill":
+		skillID := requestedSkill
+		if skillID == "" {
+			skillID = signatureSkillForClass(run.Player.Class)
 		}
-		skillCost := 3
-		if e.growthRank(run, "signature_mastery") >= 3 {
-			skillCost = 2
-		}
-		if run.Player.Energy < skillCost {
-			return errors.New("能量不足")
-		}
-		run.Player.Energy -= skillCost
-		combat.Cooldowns["skill"] = 2
-		roll := e.roll(run, "skill-attack", 20)
-		bonus := run.Player.Attributes.Will + run.Player.Attributes.Perception/2 - weaken*2
-		targetDefense := enemyDefense - 1
-		masteryBonus := e.growthRank(run, "signature_mastery") * 2
-		baseDamage := 7
-		skillName := "职业技"
-		switch run.Player.Class {
-		case "warden":
-			bonus = run.Player.Attributes.Strength + 2 - weaken*2
-			targetDefense = enemyDefense
-			baseDamage = 6
-			combat.Guarded = true
-			skillName = "铁誓猛击"
-			if e.hasTalent(run, "warden_execution") {
-				baseDamage += 5
-				if combat.Intent.Kind == "heavy" || combat.Intent.Kind == "charge" {
-					interrupted = true
-				}
-			}
-		case "ranger":
-			bonus = run.Player.Attributes.Dexterity + run.Player.Attributes.Perception/2 - weaken*2
-			targetDefense = enemyDefense - 3
-			baseDamage = 7
-			skillName = "弱点穿刺"
-		case "seer":
-			bonus = run.Player.Attributes.Will + 2 - weaken*2
-			targetDefense = enemyDefense - 2
-			baseDamage = 9
-			if run.Player.Equipment["weapon"] == "scribe_wand" {
-				baseDamage += 2
-			}
-			if combat.Distance == 3 && e.hasTalent(run, "seer_overchannel") {
-				baseDamage += 4
-			}
-			skillName = "余烬爆裂"
-		}
-		baseDamage += masteryBonus
-		critAt := 20
-		if e.hasTalent(run, "ranger_predator") {
-			critAt = 19
-		}
-		total := roll + bonus
-		critical := roll >= critAt
-		success := roll != 1 && (critical || total >= targetDefense)
-		run.LastRoll = &RollResult{Kind: "skill", Label: skillName, Roll: roll, Bonus: bonus, Total: total, DC: targetDefense, Success: success, Critical: critical}
-		if success {
-			dmg := baseDamage + bonus + e.roll(run, "skill-damage", 8)
-			if critical {
-				dmg += baseDamage
-				messages = append(messages, "技能暴击！")
-			}
-			combat.EnemyHP -= max(1, dmg)
-			messages = append(messages, fmt.Sprintf("%s命中，造成 %d 点伤害。", skillName, max(1, dmg)))
-			if run.Player.Class == "ranger" && e.hasTalent(run, "ranger_bleed") {
-				combat.EnemyStatuses = addStatus(combat.EnemyStatuses, StatusState{ID: "bleed", Name: "流血", Description: "每回合受到 2 点伤害。", Rounds: 2, Stacks: 1})
-				messages = append(messages, "敌人进入流血状态。")
-			}
-			if run.Player.Class == "seer" && e.hasTalent(run, "seer_cinder") {
-				combat.EnemyStatuses = addStatus(combat.EnemyStatuses, StatusState{ID: "burn", Name: "燃烧", Description: "余烬持续灼烧。", Rounds: 3, Stacks: 1})
-				messages = append(messages, "余烬附着在敌人身上持续燃烧。")
-			}
-			if run.Player.Class == "seer" && e.hasTalent(run, "seer_siphon") {
-				run.Player.HP = clamp(run.Player.HP+3, 0, run.Player.MaxHP)
-				messages = append(messages, "你从残响中汲取力量，恢复 3 点生命。")
-			}
-		} else {
-			messages = append(messages, skillName+"被敌人躲开。")
+		var err error
+		interrupted, err = e.useDataSkill(run, enemy, skillID, enemyDefense, weaken, &messages)
+		if err != nil {
+			return err
 		}
 	case "guard":
 		combat.Guarded = true
@@ -422,6 +357,7 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 	} else {
 		e.resolveEnemyIntent(run, enemy, &messages)
 	}
+	e.applyCombatHazards(run, &messages)
 	if run.GameOver {
 		combat.LastMessage = strings.Join(messages, " ")
 		e.log(run, "combat", combat.LastMessage)
@@ -680,8 +616,9 @@ func (e *Engine) startCombat(run *Run, enemyID string) {
 	if e.hasTalent(run, "seer_ward") {
 		combat.Counters["seer_ward"] = 1
 	}
-	combat.Intent = e.chooseEnemyIntent(run, enemy, combat)
 	run.Combat = combat
+	e.configureCombatTerrain(run, combat)
+	combat.Intent = e.chooseEnemyIntent(run, enemy, combat)
 	e.log(run, "combat", fmt.Sprintf("%s出现了。%s 初始站位：%s；敌人意图：%s。", enemy.Name, enemy.Description, distanceName(combat.Distance), combat.Intent.Label))
 }
 
@@ -851,6 +788,9 @@ func (e *Engine) applyEffects(run *Run, effects []Effect) {
 			}
 		case "quest_outcome":
 			e.setQuestOutcome(run, ef.Target, ef.Text)
+		case "quest_decision":
+			e.ensureV07State(run)
+			run.QuestDecisions[ef.Target] = ef.Text
 		case "region_state":
 			e.ensureV06State(run)
 			run.RegionStates[ef.Target] = ef.Text

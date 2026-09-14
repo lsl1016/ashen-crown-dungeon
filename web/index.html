@@ -20,7 +20,7 @@
       <p id="worldPremise" class="premise">正在读取墓城记录……</p>
 
       <div class="feature-strip">
-        <span><b>44</b> 地点</span><i></i><span><b>5</b> 核心 NPC</span><i></i><span><b>成长</b> Build</span><i></i><span><b>多帧</b> 战斗表现</span>
+        <span><b>44</b> 地点</span><i></i><span><b>Living</b> World</span><i></i><span><b>任务图</b> 分支</span><i></i><span><b>GM</b> Editor</span>
       </div>
 
       <div class="start-form">
@@ -33,7 +33,7 @@
         <button id="openSavesBtn" class="btn ghost large">读取存档</button>
         <button id="worldBtn" class="btn ghost large">世界档案</button>
       </div>
-      <p class="start-tip">V0.6 · 不接 AI。世界会持续变化：NPC 迁移、区域状态、任务结局、商店补货、装备词条，以及近 / 中 / 远三档战术站位。</p>
+      <p class="start-tip">V0.7 · Living World。世界事件会随钟声出现、升级与结束；NPC 有日程，任务拥有分叉结局，技能/效果改为结构化数据，并提供本地 GM 编辑器。</p>
     </section>
   </div>
 
@@ -47,7 +47,7 @@
         <button id="codexBtn" class="icon-btn text-btn" title="发现档案">档案</button>
         <button id="journalBtn" class="icon-btn text-btn" title="冒险日志">日志</button>
         <button id="saveBtn" class="icon-btn" title="手动存档">▣</button>
-        <button id="menuBtn" class="icon-btn" title="返回标题">⚙</button>
+        <a href="/editor" target="_blank" class="icon-btn text-btn editor-link" title="打开 GM 编辑器">GM</a><button id="menuBtn" class="icon-btn" title="返回标题">⚙</button>
       </div>
     </header>
 
@@ -127,7 +127,7 @@
               <div class="enemy-bar"><i id="enemyHpBar"></i></div><small id="enemyHpText"></small>
               <div id="enemyStatuses" class="status-row"></div>
             </div>
-            <div id="intentCard" class="intent-card"><span id="intentIcon">⚔</span><div><small>NEXT INTENT</small><b id="intentLabel">试探攻击</b><p id="intentDescription"></p></div></div>
+            <div id="intentCard" class="intent-card"><span id="intentIcon">⚔</span><div><small>NEXT INTENT</small><b id="intentLabel">试探攻击</b><p id="intentDescription"></p></div></div><div id="terrainCard" class="terrain-card"><span>⌁</span><div><small>BATTLEFIELD</small><b id="terrainLabel">开阔战场</b><p id="terrainHint"></p></div></div>
           </div>
 
           <div id="cinematicOverlay" class="cinematic-overlay hidden"><small id="cinematicKicker">ACT II</small><h2 id="cinematicTitle">雾外荒原</h2><p id="cinematicText"></p></div>
@@ -152,7 +152,7 @@
         <div id="mapCanvas" class="map-canvas"><svg id="mapSvg" viewBox="-35 -30 900 610" preserveAspectRatio="xMidYMid meet"></svg></div>
         <p class="map-help"><b>亮金节点</b>是当前位置，带脉冲外圈的节点可直接前往。锁形节点需要场景机关、钥匙或线索才能开启。</p>
 
-        <div id="worldPulse" class="world-pulse"><span>墓城异动</span><b id="worldThreat">威胁 0</b><p id="worldChange">第一声钟已经结束。</p></div>
+        <div id="worldPulse" class="world-pulse"><span>墓城异动</span><b id="worldThreat">威胁 0</b><p id="worldChange">第一声钟已经结束。</p></div><div class="section-title"><span>世界事件</span><small>LIVING WORLD</small></div><div id="worldEventList" class="world-event-list"></div>
 
         <div class="section-title"><span>附近道路</span><small>TRAVEL</small></div>
         <div id="nearbyList" class="nearby-list"></div>

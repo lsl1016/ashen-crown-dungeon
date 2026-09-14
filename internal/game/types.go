@@ -29,6 +29,7 @@ type Player struct {
 	AttributePoints int               `json:"attributePoints"`
 	MasteryPoints   int               `json:"masteryPoints"`
 	Growth          map[string]int    `json:"growth"`
+	Skills          []string          `json:"skills,omitempty"`
 }
 
 type SceneElement struct {
@@ -129,6 +130,15 @@ type EnemyIntent struct {
 	Telegraph   string `json:"telegraph"`
 }
 
+type CombatHazard struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Distance    int    `json:"distance"`
+	Damage      int    `json:"damage"`
+	Rounds      int    `json:"rounds,omitempty"`
+}
+
 type CombatState struct {
 	EnemyID        string         `json:"enemyId"`
 	Distance       int            `json:"distance"`
@@ -145,6 +155,9 @@ type CombatState struct {
 	PlayerStatuses []StatusState  `json:"playerStatuses,omitempty"`
 	Cooldowns      map[string]int `json:"cooldowns,omitempty"`
 	Counters       map[string]int `json:"counters,omitempty"`
+	Terrain        string         `json:"terrain,omitempty"`
+	TerrainHint    string         `json:"terrainHint,omitempty"`
+	Hazards        []CombatHazard `json:"hazards,omitempty"`
 }
 
 type CheckDef struct {
@@ -157,6 +170,9 @@ type Effect struct {
 	Value  int    `json:"value,omitempty"`
 	Target string `json:"target,omitempty"`
 	Text   string `json:"text,omitempty"`
+	Rounds int    `json:"rounds,omitempty"`
+	Stacks int    `json:"stacks,omitempty"`
+	Dice   int    `json:"dice,omitempty"`
 }
 
 type ChoiceDef struct {
@@ -172,6 +188,98 @@ type EventDef struct {
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	Choices     []ChoiceDef `json:"choices"`
+}
+
+type SkillDef struct {
+	ID              string   `json:"id"`
+	Class           string   `json:"class"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	Icon            string   `json:"icon"`
+	Cost            int      `json:"cost"`
+	Cooldown        int      `json:"cooldown"`
+	MinDistance     int      `json:"minDistance"`
+	MaxDistance     int      `json:"maxDistance"`
+	HitAttribute    string   `json:"hitAttribute"`
+	HitBonus        int      `json:"hitBonus"`
+	DefenseModifier int      `json:"defenseModifier"`
+	Effects         []Effect `json:"effects"`
+	Tags            []string `json:"tags,omitempty"`
+}
+
+type WorldEventDef struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Region       string `json:"region"`
+	TriggerBell  int    `json:"triggerBell"`
+	EscalateBell int    `json:"escalateBell,omitempty"`
+	ResolveFlag  string `json:"resolveFlag,omitempty"`
+	RequireFlag  string `json:"requireFlag,omitempty"`
+	Severity     int    `json:"severity"`
+	Overlay      string `json:"overlay,omitempty"`
+}
+
+type WorldEventState struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Region      string `json:"region"`
+	Stage       string `json:"stage"`
+	Status      string `json:"status"`
+	StartedBell int    `json:"startedBell"`
+	UpdatedBell int    `json:"updatedBell"`
+	Severity    int    `json:"severity"`
+	Description string `json:"description"`
+}
+
+type NPCScheduleEntry struct {
+	FromBell    int    `json:"fromBell"`
+	ToBell      int    `json:"toBell"`
+	RoomID      string `json:"roomId"`
+	Activity    string `json:"activity"`
+	RequireFlag string `json:"requireFlag,omitempty"`
+}
+
+type NPCScheduleDef struct {
+	NPCID   string             `json:"npcId"`
+	Entries []NPCScheduleEntry `json:"entries"`
+}
+
+type NPCWorldState struct {
+	Location  string   `json:"location"`
+	Activity  string   `json:"activity"`
+	Health    string   `json:"health"`
+	Mood      string   `json:"mood"`
+	Knowledge []string `json:"knowledge,omitempty"`
+}
+
+type SceneState struct {
+	Kind        string `json:"kind"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Overlay     string `json:"overlay,omitempty"`
+	Severity    int    `json:"severity,omitempty"`
+}
+
+type QuestGraphNodeDef struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Kind        string `json:"kind"`
+}
+
+type QuestGraphEdgeDef struct {
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Label     string `json:"label,omitempty"`
+	Condition string `json:"condition,omitempty"`
+}
+
+type QuestGraphDef struct {
+	ID    string              `json:"id"`
+	Title string              `json:"title"`
+	Nodes []QuestGraphNodeDef `json:"nodes"`
+	Edges []QuestGraphEdgeDef `json:"edges"`
 }
 
 type ActiveEvent struct {
@@ -310,33 +418,39 @@ type AffixState struct {
 }
 
 type Run struct {
-	ID             string                  `json:"id"`
-	Seed           int64                   `json:"seed"`
-	CreatedAt      time.Time               `json:"createdAt"`
-	UpdatedAt      time.Time               `json:"updatedAt"`
-	Turn           int                     `json:"turn"`
-	Player         Player                  `json:"player"`
-	Rooms          map[string]*Room        `json:"rooms"`
-	Edges          []Edge                  `json:"edges"`
-	CurrentRoomID  string                  `json:"currentRoomId"`
-	ActiveEvent    *ActiveEvent            `json:"activeEvent,omitempty"`
-	ActiveDialogue *ActiveDialogue         `json:"activeDialogue,omitempty"`
-	ActiveShop     string                  `json:"activeShop,omitempty"`
-	Combat         *CombatState            `json:"combat,omitempty"`
-	Flags          map[string]bool         `json:"flags"`
-	Quests         map[string]*QuestState  `json:"quests"`
-	Lore           []LoreEntry             `json:"lore"`
-	LastRoll       *RollResult             `json:"lastRoll,omitempty"`
-	Log            []LogEntry              `json:"log"`
-	Clock          WorldClock              `json:"clock"`
-	NPCRelations   map[string]int          `json:"npcRelations,omitempty"`
-	NPCLocations   map[string]string       `json:"npcLocations,omitempty"`
-	RegionStates   map[string]string       `json:"regionStates,omitempty"`
-	ShopStock      map[string]int          `json:"shopStock,omitempty"`
-	ShopRefresh    map[string]int          `json:"shopRefresh,omitempty"`
-	ItemAffixes    map[string][]AffixState `json:"itemAffixes,omitempty"`
-	GameOver       bool                    `json:"gameOver"`
-	Victory        bool                    `json:"victory"`
+	ID              string                      `json:"id"`
+	Seed            int64                       `json:"seed"`
+	CreatedAt       time.Time                   `json:"createdAt"`
+	UpdatedAt       time.Time                   `json:"updatedAt"`
+	Turn            int                         `json:"turn"`
+	Player          Player                      `json:"player"`
+	Rooms           map[string]*Room            `json:"rooms"`
+	Edges           []Edge                      `json:"edges"`
+	CurrentRoomID   string                      `json:"currentRoomId"`
+	ActiveEvent     *ActiveEvent                `json:"activeEvent,omitempty"`
+	ActiveDialogue  *ActiveDialogue             `json:"activeDialogue,omitempty"`
+	ActiveShop      string                      `json:"activeShop,omitempty"`
+	Combat          *CombatState                `json:"combat,omitempty"`
+	Flags           map[string]bool             `json:"flags"`
+	Quests          map[string]*QuestState      `json:"quests"`
+	Lore            []LoreEntry                 `json:"lore"`
+	LastRoll        *RollResult                 `json:"lastRoll,omitempty"`
+	Log             []LogEntry                  `json:"log"`
+	Clock           WorldClock                  `json:"clock"`
+	NPCRelations    map[string]int              `json:"npcRelations,omitempty"`
+	NPCLocations    map[string]string           `json:"npcLocations,omitempty"`
+	NPCOverrides    map[string]string           `json:"npcOverrides,omitempty"`
+	RegionStates    map[string]string           `json:"regionStates,omitempty"`
+	RegionOverrides map[string]string           `json:"regionOverrides,omitempty"`
+	ShopStock       map[string]int              `json:"shopStock,omitempty"`
+	ShopRefresh     map[string]int              `json:"shopRefresh,omitempty"`
+	ItemAffixes     map[string][]AffixState     `json:"itemAffixes,omitempty"`
+	WorldEvents     map[string]*WorldEventState `json:"worldEvents,omitempty"`
+	NPCWorld        map[string]*NPCWorldState   `json:"npcWorld,omitempty"`
+	SceneStates     map[string]*SceneState      `json:"sceneStates,omitempty"`
+	QuestDecisions  map[string]string           `json:"questDecisions,omitempty"`
+	GameOver        bool                        `json:"gameOver"`
+	Victory         bool                        `json:"victory"`
 }
 
 type TalentDef struct {
@@ -352,21 +466,25 @@ type TalentDef struct {
 }
 
 type WorldMeta struct {
-	Title     string                 `json:"title"`
-	Subtitle  string                 `json:"subtitle"`
-	Premise   string                 `json:"premise"`
-	Era       string                 `json:"era"`
-	Factions  []string               `json:"factions"`
-	Truths    []string               `json:"truths"`
-	Classes   []ClassDef             `json:"classes"`
-	Talents   []TalentDef            `json:"talents"`
-	Items     map[string]ItemDef     `json:"items"`
-	NPCs      map[string]NPCDef      `json:"npcs"`
-	Shops     map[string]ShopDef     `json:"shops"`
-	Dialogues map[string]DialogueDef `json:"dialogues"`
-	Growth    []GrowthDef            `json:"growth"`
-	Affixes   []AffixDef             `json:"affixes,omitempty"`
-	ToolHint  string                 `json:"toolHint"`
+	Title        string                    `json:"title"`
+	Subtitle     string                    `json:"subtitle"`
+	Premise      string                    `json:"premise"`
+	Era          string                    `json:"era"`
+	Factions     []string                  `json:"factions"`
+	Truths       []string                  `json:"truths"`
+	Classes      []ClassDef                `json:"classes"`
+	Talents      []TalentDef               `json:"talents"`
+	Items        map[string]ItemDef        `json:"items"`
+	NPCs         map[string]NPCDef         `json:"npcs"`
+	Shops        map[string]ShopDef        `json:"shops"`
+	Dialogues    map[string]DialogueDef    `json:"dialogues"`
+	Growth       []GrowthDef               `json:"growth"`
+	Affixes      []AffixDef                `json:"affixes,omitempty"`
+	Skills       map[string]SkillDef       `json:"skills,omitempty"`
+	WorldEvents  map[string]WorldEventDef  `json:"worldEvents,omitempty"`
+	NPCSchedules map[string]NPCScheduleDef `json:"npcSchedules,omitempty"`
+	QuestGraphs  map[string]QuestGraphDef  `json:"questGraphs,omitempty"`
+	ToolHint     string                    `json:"toolHint"`
 }
 
 type ClassDef struct {

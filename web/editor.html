@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#090b0f" />
+  <title>灰烬王冠 · GM Editor</title>
+  <link rel="stylesheet" href="/editor.css" />
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+  <header class="topbar">
+    <div class="brand"><span>♛</span><div><small>ASHEN CROWN · LOCAL DEV TOOL</small><h1>GM Editor <b>V0.7</b></h1></div></div>
+    <div class="top-actions"><span id="saveState" class="status-pill">本地内容覆盖</span><a href="/" class="btn ghost">← 返回游戏</a></div>
+  </header>
+
+  <div class="warning"><b>开发模式：</b>此页面可直接修改本地内容覆盖与运行中的世界状态，没有账号鉴权。请只在本机使用，不要把服务公开到公网。</div>
+
+  <main class="layout">
+    <section class="card content-card">
+      <div class="card-head">
+        <div><small>CONTENT LIBRARY</small><h2>内容库</h2></div>
+        <div class="head-actions"><button id="newContentBtn" class="btn">＋ 新建</button><button id="duplicateBtn" class="btn">复制</button><button id="exportBtn" class="btn">导出 JSON</button></div>
+      </div>
+      <div class="content-grid">
+        <aside class="content-browser">
+          <label>类型<select id="kindSelect"></select></label>
+          <label>搜索<input id="contentSearch" placeholder="ID / 名称 / 标题" /></label>
+          <div id="contentStats" class="stats"></div>
+          <div id="contentList" class="content-list"></div>
+        </aside>
+        <div class="editor-pane">
+          <div class="editor-toolbar">
+            <label>ID<input id="contentId" /></label>
+            <span id="overrideBadge" class="badge hidden">OVERRIDE</span>
+            <button id="saveContentBtn" class="btn primary">保存覆盖</button>
+          </div>
+          <textarea id="contentJson" spellcheck="false"></textarea>
+          <div id="contentPreview" class="preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card world-card">
+      <div class="card-head">
+        <div><small>LIVE RUN</small><h2>运行中的世界</h2></div>
+        <div class="head-actions"><select id="runSelect"></select><button id="refreshRunBtn" class="btn">刷新</button><button id="advanceBellBtn" class="btn danger">推进一钟</button></div>
+      </div>
+      <div id="noRun" class="empty hidden">还没有 Run。先回到游戏创建一名角色。</div>
+      <div id="runWorkspace" class="run-workspace">
+        <div class="run-summary" id="runSummary"></div>
+
+        <div class="world-columns">
+          <div class="world-block">
+            <h3>世界事件</h3>
+            <div class="inline-form"><select id="eventSelect"></select><button id="triggerEventBtn" class="btn">强制触发</button></div>
+            <div id="activeEvents" class="mini-list"></div>
+          </div>
+          <div class="world-block">
+            <h3>NPC 调度</h3>
+            <div class="inline-form triple"><select id="npcSelect"></select><select id="npcRoomSelect"></select><button id="moveNpcBtn" class="btn">移动</button></div>
+            <div id="npcWorldList" class="mini-list"></div>
+          </div>
+          <div class="world-block">
+            <h3>区域状态</h3>
+            <div class="inline-form"><select id="regionSelect"></select><input id="regionValue" placeholder="新的区域状态" /><button id="setRegionBtn" class="btn">写入</button></div>
+            <div id="regionList" class="mini-list"></div>
+          </div>
+          <div class="world-block">
+            <h3>世界 Flag</h3>
+            <div class="inline-form"><input id="flagName" placeholder="例如 gate_warning" /><select id="flagValue"><option value="true">true</option><option value="false">false</option></select><button id="setFlagBtn" class="btn">设置</button></div>
+            <div id="flagList" class="flag-list"></div>
+          </div>
+        </div>
+
+        <div class="room-editor">
+          <div class="room-head"><div><small>MAP / SCENE</small><h3>地点编辑器</h3></div><div class="head-actions"><select id="roomSelect"></select><button id="newRoomBtn" class="btn">＋ 新地点</button><button id="saveRoomBtn" class="btn primary">写入 Run</button></div></div>
+          <div class="room-grid">
+            <textarea id="roomJson" spellcheck="false"></textarea>
+            <div class="room-side">
+              <label>连接到<select id="connectRoomSelect"><option value="">不新增连接</option></select></label>
+              <div id="roomSceneState" class="scene-state"></div>
+              <div class="map-mini"><svg id="miniMap" viewBox="0 0 620 340"></svg></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/editor.js"></script>
+</body>
+</html>

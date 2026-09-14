@@ -24,6 +24,41 @@ type SaveFile struct {
 	Run  *Run     `json:"run"`
 }
 
+type RunSummary struct {
+	ID          string    `json:"id"`
+	PlayerName  string    `json:"playerName"`
+	Level       int       `json:"level"`
+	CurrentRoom string    `json:"currentRoom"`
+	Bell        int       `json:"bell"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func (s *Store) ListRuns() ([]RunSummary, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entries, err := os.ReadDir(filepath.Join(s.root, "runs"))
+	if err != nil {
+		return nil, err
+	}
+	out := []RunSummary{}
+	for _, ent := range entries {
+		if ent.IsDir() || filepath.Ext(ent.Name()) != ".json" {
+			continue
+		}
+		var r Run
+		if readJSON(filepath.Join(s.root, "runs", ent.Name()), &r) != nil {
+			continue
+		}
+		room := r.CurrentRoomID
+		if rr := r.Rooms[r.CurrentRoomID]; rr != nil {
+			room = rr.Name
+		}
+		out = append(out, RunSummary{ID: r.ID, PlayerName: r.Player.Name, Level: r.Player.Level, CurrentRoom: room, Bell: r.Clock.Bell, UpdatedAt: r.UpdatedAt})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].UpdatedAt.After(out[j].UpdatedAt) })
+	return out, nil
+}
+
 type Store struct {
 	root string
 	mu   sync.RWMutex
@@ -32,7 +67,41 @@ type Store struct {
 func NewStore(root string) *Store {
 	_ = os.MkdirAll(filepath.Join(root, "runs"), 0755)
 	_ = os.MkdirAll(filepath.Join(root, "saves"), 0755)
+	_ = os.MkdirAll(filepath.Join(root, "editor"), 0755)
 	return &Store{root: root}
+}
+
+func (s *Store) LoadContentOverrides() ([]ContentOverride, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var f EditorOverrideFile
+	err := readJSON(filepath.Join(s.root, "editor", "content_overrides.json"), &f)
+	if os.IsNotExist(err) {
+		return []ContentOverride{}, nil
+	}
+	return f.Overrides, err
+}
+
+func (s *Store) UpsertContentOverride(next ContentOverride) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := filepath.Join(s.root, "editor", "content_overrides.json")
+	var f EditorOverrideFile
+	if err := readJSON(path, &f); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	found := false
+	for i := range f.Overrides {
+		if f.Overrides[i].Kind == next.Kind && f.Overrides[i].ID == next.ID {
+			f.Overrides[i] = next
+			found = true
+			break
+		}
+	}
+	if !found {
+		f.Overrides = append(f.Overrides, next)
+	}
+	return writeJSON(path, f)
 }
 
 func (s *Store) SaveRun(r *Run) error {

@@ -22,6 +22,9 @@ func ToolDefinitions() []ToolDefinition {
 		{Name: "set_flag", Description: "写入世界事实/剧情标记。", InputSchema: obj(map[string]any{"key": map[string]any{"type": "string"}, "value": map[string]any{"type": "boolean"}}, "key", "value")},
 		{Name: "grant_item", Description: "由规则引擎校验后给予玩家物品。", InputSchema: obj(map[string]any{"itemId": map[string]any{"type": "string"}}, "itemId")},
 		{Name: "spawn_enemy", Description: "在当前房间生成一个预定义敌人并开始战斗。", InputSchema: obj(map[string]any{"enemyId": map[string]any{"type": "string"}}, "enemyId")},
+		{Name: "move_npc", Description: "移动一个持久 NPC 到已存在的房间；位置会进入真实世界状态。", InputSchema: obj(map[string]any{"npcId": map[string]any{"type": "string"}, "roomId": map[string]any{"type": "string"}}, "npcId", "roomId")},
+		{Name: "set_region_state", Description: "修改一个区域的持续状态，并同步场景表现。", InputSchema: obj(map[string]any{"region": map[string]any{"type": "string"}, "state": map[string]any{"type": "string"}}, "region", "state")},
+		{Name: "trigger_world_event", Description: "触发一个已定义的世界事件，影响区域、NPC 与场景状态。", InputSchema: obj(map[string]any{"eventId": map[string]any{"type": "string"}}, "eventId")},
 	}
 }
 
@@ -79,6 +82,17 @@ func (e *Engine) ExecuteTool(run *Run, name string, args map[string]any) error {
 			return errors.New("已经在战斗中")
 		}
 		e.startCombat(run, id)
+	case "move_npc":
+		npcID, _ := args["npcId"].(string)
+		roomID, _ := args["roomId"].(string)
+		return e.GMMoveNPC(run, npcID, roomID)
+	case "set_region_state":
+		region, _ := args["region"].(string)
+		state, _ := args["state"].(string)
+		return e.GMSetRegion(run, region, state)
+	case "trigger_world_event":
+		eventID, _ := args["eventId"].(string)
+		return e.GMTriggerWorldEvent(run, eventID)
 	default:
 		return errors.New("未知工具")
 	}
