@@ -38,6 +38,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/agent/tools", s.agentTools)
 	s.mux.HandleFunc("GET /api/agent/tools/{name}", s.agentToolDefinition)
 	s.mux.HandleFunc("POST /api/agent/tools/execute", s.agentExecute)
+	s.mux.HandleFunc("POST /api/agent/tools/call/{name}", s.agentToolCall)
 	s.mux.HandleFunc("GET /api/agent/audit", s.agentAudit)
 	s.mux.HandleFunc("POST /mcp", s.mcp)
 	s.mux.HandleFunc("GET /api/editor/content", s.editorContent)

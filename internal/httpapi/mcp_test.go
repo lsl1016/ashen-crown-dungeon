@@ -147,3 +147,53 @@ func TestAgentGatewayAuth(t *testing.T) {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestAgentToolCallFacade(t *testing.T) {
+	s, run := newMCPTestServer(t)
+	body, _ := json.Marshal(map[string]any{
+		"runId":      run.ID,
+		"visibility": "gm",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tools/call/inspect_world", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out["success"] != true {
+		t.Fatalf("unexpected facade response: %v", out)
+	}
+	if out["tool"] != "inspect_world" || out["runId"] != run.ID {
+		t.Fatalf("unexpected facade response: %v", out)
+	}
+	if _, wrapped := out["result"]; wrapped {
+		t.Fatalf("facade must return flattened result, got: %v", out)
+	}
+}
+
+func TestAgentToolCallFacadeBusinessErrorUsesHTTP200(t *testing.T) {
+	s, run := newMCPTestServer(t)
+	body, _ := json.Marshal(map[string]any{"runId": run.ID})
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/tools/call/not_a_tool", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected HTTP 200 business error, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out["success"] != false {
+		t.Fatalf("expected success=false, got %v", out)
+	}
+	if out["message"] == "" {
+		t.Fatalf("expected model-readable error message, got %v", out)
+	}
+}
