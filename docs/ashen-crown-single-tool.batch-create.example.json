@@ -1,0 +1,18 @@
+{
+  "tools": [
+    {
+      "bizTag": "ashen-crown-gm",
+      "url": "http://ashen-crown:8080/api/agent/tools/execute",
+      "requestConfig": "{\"method\":\"POST\",\"timeout_ms\":10000,\"headers\":{\"Authorization\":\"Bearer <ASHEN_AGENT_TOKEN>\",\"X-Agent-Name\":\"mcp-server\"}}",
+      "name": "ashen_crown_execute",
+      "title": "Ashen Crown GM Execute",
+      "description": "零改造兼容模式：通过一个总入口执行任意 Ashen Crown GM Tool。推荐仅用于联调，正式环境使用独立工具注册。",
+      "inputSchema": "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"tool\":{\"type\":\"string\",\"enum\":[\"advance_bell\",\"connect_rooms\",\"create_room\",\"grant_item\",\"inspect_combat\",\"inspect_npc\",\"inspect_quest\",\"inspect_room\",\"inspect_world\",\"list_world_events\",\"move_npc\",\"recent_log\",\"reveal_room\",\"roll_check\",\"search_catalog\",\"set_flag\",\"set_region_state\",\"spawn_enemy\",\"trigger_world_event\"]},\"arguments\":{\"type\":\"object\",\"additionalProperties\":true}},\"required\":[\"tool\",\"arguments\"]}",
+      "outputSchema": "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"x-output-projection\":true,\"properties\":{\"result\":{\"type\":\"object\",\"additionalProperties\":true,\"description\":\"Ashen Crown AgentToolResult。\"}},\"required\":[\"result\"],\"additionalProperties\":false}",
+      "readOnly": 1,
+      "isInternal": 2,
+      "status": 2,
+      "owner": "ashen-crown"
+    }
+  ]
+}
