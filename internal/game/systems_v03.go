@@ -400,6 +400,8 @@ func (e *Engine) enemyAttackOnce(run *Run, enemy EnemyDef, attackMod, damageMod 
 
 func (e *Engine) executeElementAction(run *Run, room *Room, el *SceneElement) error {
 	switch el.Action {
+	case "dialogue":
+		return e.StartDialogue(run, el.Target)
 	case "event":
 		if _, ok := Events[el.Target]; !ok {
 			return errors.New("事件不存在")

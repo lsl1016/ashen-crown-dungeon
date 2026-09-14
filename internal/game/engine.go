@@ -37,13 +37,15 @@ func (e *Engine) NewRun(name, classID string, seed int64) (*Run, error) {
 		Defense: class.Defense, Gold: 24, Attributes: class.Attributes,
 		Inventory: []string{class.StarterItem, "healing_draught", "bandage"},
 		Equipment: map[string]string{"weapon": class.StarterItem}, TalentPoints: 1, Talents: map[string]int{},
+		AttributePoints: 1, MasteryPoints: 1, Growth: map[string]int{},
 	}
 	run := &Run{
 		ID:   fmt.Sprintf("run_%x", hash64(fmt.Sprintf("%d-%s-%d", seed, name, time.Now().UnixNano()))),
 		Seed: seed, CreatedAt: time.Now(), UpdatedAt: time.Now(), Turn: 1,
 		Player: player, Rooms: rooms, Edges: edges, CurrentRoomID: "room_01",
 		Flags: map[string]bool{}, Quests: map[string]*QuestState{}, Lore: []LoreEntry{}, Log: []LogEntry{},
-		Clock: WorldClock{Bell: 1, Steps: 0, Threat: 0, LastChange: "第一声钟已经结束。墓城开始重新排列道路。"},
+		Clock:        WorldClock{Bell: 1, Steps: 0, Threat: 0, LastChange: "第一声钟已经结束。墓城开始重新排列道路。"},
+		NPCRelations: map[string]int{}, ShopStock: initialShopStock(),
 	}
 	// 每个职业都带一件能展示 V0.3 装备 Build 的起始副装备。
 	switch class.ID {
@@ -73,6 +75,9 @@ func (e *Engine) Move(run *Run, target string) error {
 	}
 	if run.ActiveEvent != nil {
 		return errors.New("必须先处理当前事件")
+	}
+	if run.ActiveDialogue != nil || run.ActiveShop != "" {
+		return errors.New("请先结束当前对话或交易")
 	}
 	room := run.Rooms[target]
 	if room == nil {
@@ -200,6 +205,9 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 			bonus = run.Player.Attributes.Dexterity
 		}
 		bonus -= weaken * 2
+		if e.growthRank(run, "weapon_training") >= 3 {
+			bonus++
+		}
 		critAt := 20
 		if e.hasTalent(run, "ranger_predator") {
 			critAt = 19
@@ -209,7 +217,7 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 		success := roll != 1 && (critical || total >= enemyDefense)
 		run.LastRoll = &RollResult{Kind: "attack", Label: "普通攻击", Roll: roll, Bonus: bonus, Total: total, DC: enemyDefense, Success: success, Critical: critical}
 		if success {
-			dmg := 2 + bonus + e.roll(run, "player-damage", 6) + e.weaponPower(run)
+			dmg := 2 + bonus + e.roll(run, "player-damage", 6) + e.weaponPower(run) + e.growthRank(run, "weapon_training")
 			if critical {
 				dmg += 4 + e.weaponPower(run)
 				messages = append(messages, "暴击！")
@@ -235,14 +243,19 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 		if combat.Cooldowns["skill"] > 0 {
 			return fmt.Errorf("职业技还需要 %d 回合冷却", combat.Cooldowns["skill"])
 		}
-		if run.Player.Energy < 3 {
+		skillCost := 3
+		if e.growthRank(run, "signature_mastery") >= 3 {
+			skillCost = 2
+		}
+		if run.Player.Energy < skillCost {
 			return errors.New("能量不足")
 		}
-		run.Player.Energy -= 3
+		run.Player.Energy -= skillCost
 		combat.Cooldowns["skill"] = 2
 		roll := e.roll(run, "skill-attack", 20)
 		bonus := run.Player.Attributes.Will + run.Player.Attributes.Perception/2 - weaken*2
 		targetDefense := enemyDefense - 1
+		masteryBonus := e.growthRank(run, "signature_mastery") * 2
 		baseDamage := 7
 		skillName := "职业技"
 		switch run.Player.Class {
@@ -272,6 +285,7 @@ func (e *Engine) CombatAction(run *Run, action string) error {
 			}
 			skillName = "余烬爆裂"
 		}
+		baseDamage += masteryBonus
 		critAt := 20
 		if e.hasTalent(run, "ranger_predator") {
 			critAt = 19
@@ -475,6 +489,9 @@ func (e *Engine) Interact(run *Run, elementID string) error {
 	if run.ActiveEvent != nil {
 		return errors.New("请先处理当前事件")
 	}
+	if run.ActiveDialogue != nil || run.ActiveShop != "" {
+		return errors.New("请先结束当前对话或交易")
+	}
 	room := run.Rooms[run.CurrentRoomID]
 	if room == nil {
 		return errors.New("当前房间不存在")
@@ -631,6 +648,19 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 	run.Player.XP += enemy.XP
 	msg := fmt.Sprintf("你击败了%s，获得 %d 金币与 %d 经验。", enemy.Name, gold, enemy.XP)
 
+	if enemy.ID == "storm_knight" {
+		if q := run.Quests["storm_hunt"]; q != nil && q.Status == "active" {
+			q.Progress = min(q.Goal, q.Progress+1)
+			if q.Progress >= q.Goal {
+				q.Status = "completed"
+				run.Player.Gold += 28
+				run.Player.XP += 18
+				run.Flags["storm_hunt_complete"] = true
+				msg += " 你记下空钟纹路并完成『空钟猎人』，额外获得 28 金币与 18 经验。"
+			}
+		}
+	}
+
 	if !enemy.Boss {
 		lootPool := []string{"bandage", "healing_draught", "frost_salt", "luminous_tonic"}
 		chance := e.roll(run, "loot-drop", 100)
@@ -687,6 +717,9 @@ func (e *Engine) winCombat(run *Run, enemy EnemyDef) {
 
 func (e *Engine) applyEffects(run *Run, effects []Effect) {
 	for _, ef := range effects {
+		if e.applyDialogueEffect(run, ef) {
+			continue
+		}
 		switch ef.Type {
 		case "gold":
 			run.Player.Gold = max(0, run.Player.Gold+ef.Value)
@@ -719,6 +752,10 @@ func (e *Engine) applyEffects(run *Run, effects []Effect) {
 			e.levelUp(run)
 		case "quest":
 			if run.Quests[ef.Target] == nil {
+				if q := v05Quest(run, ef.Target); q != nil {
+					run.Quests[ef.Target] = q
+					break
+				}
 				switch ef.Target {
 				case "lost_patrol":
 					run.Quests[ef.Target] = &QuestState{ID: ef.Target, Title: "支线 · 失踪巡夜队", Description: "寻找伊文失踪的队长，并查明巡夜队在王庭门前遭遇了什么。", Status: "active", Goal: 1}
@@ -835,7 +872,11 @@ func (e *Engine) levelUp(run *Run) {
 		run.Player.MaxEnergy++
 		run.Player.Energy = run.Player.MaxEnergy
 		run.Player.TalentPoints++
-		e.log(run, "level", fmt.Sprintf("你升到了 %d 级，并获得 1 点天赋点。生命与能量得到恢复。", run.Player.Level))
+		run.Player.AttributePoints++
+		if run.Player.Level%2 == 0 {
+			run.Player.MasteryPoints++
+		}
+		e.log(run, "level", fmt.Sprintf("你升到了 %d 级：获得 1 点天赋、1 点属性点%s。生命与能量得到恢复。", run.Player.Level, map[bool]string{true: "、1 点精通点", false: ""}[run.Player.Level%2 == 0]))
 	}
 }
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#b95d5f" stop-opacity=".34"/><stop offset="1" stop-color="#b95d5f" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<path d="M210 172 C159 124 109 164 114 221 C57 213 25 264 72 299 C33 337 58 392 112 381 C103 444 145 478 191 448 L210 564 L229 448 C274 478 317 444 308 381 C362 392 388 337 348 299 C396 264 363 213 307 221 C312 164 262 124 210 172Z" fill="#171a20" stroke="#050608" stroke-width="8"/><path d="M155 237 Q210 204 267 237 L210 280Z" fill="#343b47"/><circle cx="185" cy="225" r="7" fill="#b95d5f"/><circle cx="236" cy="225" r="7" fill="#b95d5f"/><text x="210" y="594" fill="#cfc7ba" text-anchor="middle" font-family="serif" font-size="19" letter-spacing="2">噬忆鸦群</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#b95d5f" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#b95d5f" stroke-opacity=".55" stroke-width="2"/>
+</svg>

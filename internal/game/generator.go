@@ -115,6 +115,7 @@ func GenerateDungeon(seed int64) (map[string]*Room, []Edge) {
 	if r.Intn(4) == 3 {
 		edges = append(edges, Edge{From: "room_13", To: "room_18"})
 	}
+	applyV05Actors(rooms)
 	return rooms, edges
 }
 

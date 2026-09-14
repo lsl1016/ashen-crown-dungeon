@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#9d71ad" stop-opacity=".34"/><stop offset="1" stop-color="#9d71ad" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<path d="M210 96 C121 141 103 234 131 312 C75 397 99 496 56 566 C130 539 157 572 210 533 C264 574 301 536 367 566 C322 485 351 402 291 310 C320 230 296 139 210 96Z" fill="#3a3445" stroke="#111018" stroke-width="8"/><ellipse cx="177" cy="217" rx="19" ry="11" fill="#9d71ad"/><ellipse cx="243" cy="217" rx="19" ry="11" fill="#9d71ad"/><path d="M166 267 Q210 232 254 267" stroke="#9a809f" stroke-width="5" fill="none"/><path d="M130 328 Q210 378 292 328" stroke="#6c5b76" stroke-width="6" fill="none" opacity=".7"/><text x="210" y="594" fill="#cfc7ba" text-anchor="middle" font-family="serif" font-size="19" letter-spacing="2">噬名残响</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#9d71ad" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#9d71ad" stroke-opacity=".55" stroke-width="2"/>
+</svg>

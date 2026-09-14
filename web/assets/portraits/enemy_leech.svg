@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#9d71c0" stop-opacity=".34"/><stop offset="1" stop-color="#9d71c0" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<path d="M210 104 C312 119 347 204 304 289 C272 352 293 445 344 531 C277 505 245 522 211 559 C178 523 145 506 78 531 C130 441 147 354 115 289 C72 204 109 118 210 104Z" fill="#36283f" stroke="#100c14" stroke-width="9"/><path d="M142 242 Q210 294 280 242 Q248 320 210 331 Q171 320 142 242Z" fill="#08070a"/><g fill="#b98bca"><circle cx="169" cy="198" r="9"/><circle cx="210" cy="184" r="9"/><circle cx="251" cy="198" r="9"/></g><text x="210" y="594" fill="#cfc7ba" text-anchor="middle" font-family="serif" font-size="19" letter-spacing="2">天穹水蛭</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#9d71c0" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#9d71c0" stroke-opacity=".55" stroke-width="2"/>
+</svg>

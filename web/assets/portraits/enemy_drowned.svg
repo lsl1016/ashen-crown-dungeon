@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#62a4a3" stop-opacity=".34"/><stop offset="1" stop-color="#62a4a3" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<path d="M145 154 Q210 102 275 154 V298 Q210 338 145 298Z" fill="#374a4f" stroke="#0a1114" stroke-width="9"/><path d="M156 204 H264" stroke="#071012" stroke-width="19"/><circle cx="181" cy="204" r="5" fill="#75b2b2"/><circle cx="241" cy="204" r="5" fill="#75b2b2"/><path d="M95 552 Q107 353 160 304 H258 Q314 353 328 552Z" fill="#26393d" stroke="#091012" stroke-width="9"/><circle cx="210" cy="390" r="64" fill="none" stroke="#6c817e" stroke-width="16"/><circle cx="210" cy="390" r="17" fill="#172023"/><text x="210" y="594" fill="#cfc7ba" text-anchor="middle" font-family="serif" font-size="19" letter-spacing="2">沉钟人</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#62a4a3" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#62a4a3" stroke-opacity=".55" stroke-width="2"/>
+</svg>

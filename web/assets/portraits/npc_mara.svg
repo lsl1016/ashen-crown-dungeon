@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#77a0aa" stop-opacity=".34"/><stop offset="1" stop-color="#77a0aa" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+
+<ellipse cx="210" cy="550" rx="145" ry="38" fill="#000" opacity=".55"/>
+<path d="M82 563 C92 425 125 337 172 309 L248 309 C302 342 334 429 342 563Z" fill="#31302d" stroke="#000" stroke-width="6"/>
+<path d="M164 314 C168 345 252 345 256 314 L246 282 H174Z" fill="#b7977f" opacity=".95"/>
+<ellipse cx="210" cy="230" rx="78" ry="96" fill="#b7977f" stroke="#08090b" stroke-width="7"/>
+<path d="M133 229 C132 112 166 91 215 92 C274 93 294 129 285 219 C267 169 235 146 188 150 C165 152 145 181 133 229Z" fill="#78634f"/>
+<path d="M161 227 Q180 216 194 229M226 229 Q242 216 259 227" stroke="#17191d" stroke-width="7" stroke-linecap="round" fill="none"/>
+<circle cx="178" cy="229" r="4" fill="#77a0aa"/><circle cx="242" cy="229" r="4" fill="#77a0aa"/>
+<path d="M188 275 Q210 288 234 274" stroke="#342b29" stroke-width="4" fill="none"/>
+<path d="M102 439 Q210 392 320 439" fill="none" stroke="#77a0aa" stroke-opacity=".38" stroke-width="3"/>
+<path d="M137 196 Q210 163 283 198" fill="none" stroke="#68878e" stroke-width="12"/><rect x="147" y="184" width="54" height="29" rx="13" fill="#111b20" stroke="#7ea4ad" stroke-width="4"/><rect x="218" y="184" width="54" height="29" rx="13" fill="#111b20" stroke="#7ea4ad" stroke-width="4"/><path d="M127 389 L321 500" stroke="#6b5336" stroke-width="12"/><path d="M291 465 l38 25 -16 14 -38-25z" fill="#9bb6b8"/>
+<text x="210" y="586" fill="#d8d0c1" text-anchor="middle" font-family="serif" font-size="21" letter-spacing="2">玛 拉</text>
+<text x="210" y="608" fill="#8d887f" text-anchor="middle" font-family="sans-serif" font-size="11" letter-spacing="3">WIND SCOUT</text>
+
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#77a0aa" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#77a0aa" stroke-opacity=".55" stroke-width="2"/>
+</svg>

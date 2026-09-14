@@ -1,6 +1,6 @@
 # AI / DM Agent 接入预留
 
-V0.4 **仍然没有接入 LLM**。这不是缺项，而是刻意让 Game Runtime 先成为独立、可玩的规则引擎。
+V0.5 **仍然没有接入 LLM**。这不是缺项，而是刻意让 Game Runtime 先成为独立、可玩的规则引擎。
 
 当前已经提供：
 
@@ -63,3 +63,14 @@ AI 可以创造和组合**数据**，但不应该在游戏运行时：
 - 绕过 Game Runtime 发放物品或修改 HP
 
 原则仍然是：**代码定义能力，数据定义世界，AI 通过受控 Tool 操纵能力和数据。**
+
+
+## V0.5 可作为 AI 上下文的新状态
+
+- `NPCRelations`：人物关系与对话选择后果。
+- `ActiveDialogue`：当前结构化对话节点。
+- `ActiveShop` / `ShopStock`：交易上下文与世界库存。
+- `Quests`：由 NPC 主动接受的任务。
+- `Player.Growth`：长期战斗精通。
+
+未来 Agent 可以读取这些状态，但仍应通过规则层 API / Tool 修改它们。

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#a86b56" stop-opacity=".34"/><stop offset="1" stop-color="#a86b56" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<path d="M126 282 L148 134 Q210 86 273 134 L294 282Z" fill="url(#metal)" stroke="#0b0e11" stroke-width="9"/><path d="M148 194 H274 L264 236 H159Z" fill="#050709"/><circle cx="183" cy="214" r="6" fill="#a86b56"/><circle cx="241" cy="214" r="6" fill="#a86b56"/><path d="M91 548 Q104 340 151 291 H270 Q317 346 329 548Z" fill="#252c33" stroke="#090c0f" stroke-width="9"/><path d="M104 420 L319 365" stroke="#a9a39a" stroke-width="13"/><path d="M302 353 L349 341 L315 388Z" fill="#bcb5a9"/><text x="210" y="594" fill="#cfc7ba" text-anchor="middle" font-family="serif" font-size="19" letter-spacing="2">记忆骑士</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#a86b56" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#a86b56" stroke-opacity=".55" stroke-width="2"/>
+</svg>

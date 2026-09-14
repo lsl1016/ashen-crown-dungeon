@@ -20,7 +20,7 @@
       <p id="worldPremise" class="premise">正在读取墓城记录……</p>
 
       <div class="feature-strip">
-        <span><b>44</b> 地点</span><i></i><span><b>双幕</b> 世界推进</span><i></i><span><b>12</b> 职业天赋</span><i></i><span><b>意图制</b> 战斗</span>
+        <span><b>44</b> 地点</span><i></i><span><b>5</b> 核心 NPC</span><i></i><span><b>成长</b> Build</span><i></i><span><b>多帧</b> 战斗表现</span>
       </div>
 
       <div class="start-form">
@@ -33,7 +33,7 @@
         <button id="openSavesBtn" class="btn ghost large">读取存档</button>
         <button id="worldBtn" class="btn ghost large">世界档案</button>
       </div>
-      <p class="start-tip">V0.4 · 不接 AI。双幕战役、44 地点、场景角色实体、伤害/技能特效、Boss 入场与转阶段演出、合成音效，以及雾外荒原第二大区域。</p>
+      <p class="start-tip">V0.5 · 不接 AI。新增角色/怪物立绘、多帧动作、NPC 对话树、关系值、商店买卖、任务选择、属性/精通成长与多层环境表现。</p>
     </section>
   </div>
 
@@ -43,7 +43,7 @@
       <div class="top-center"><span id="roomBreadcrumb">外墓区 / 入口</span><span class="seed-chip">BELL <b id="bellLabel">I / XIII</b></span><span class="seed-chip">SEED <b id="seedLabel">-</b></span></div>
       <div class="top-actions">
         <button id="soundBtn" class="icon-btn text-btn" title="声音开关">声音 ON</button>
-        <button id="talentBtn" class="icon-btn text-btn talent-top" title="职业天赋">天赋 <b id="talentPointBadge">1</b></button>
+        <button id="talentBtn" class="icon-btn text-btn talent-top" title="角色成长">成长 <b id="talentPointBadge">3</b></button>
         <button id="codexBtn" class="icon-btn text-btn" title="发现档案">档案</button>
         <button id="journalBtn" class="icon-btn text-btn" title="冒险日志">日志</button>
         <button id="saveBtn" class="icon-btn" title="手动存档">▣</button>
@@ -53,7 +53,7 @@
 
     <section class="layout">
       <aside class="left-panel panel">
-        <div class="portrait-wrap"><div id="classIcon" class="portrait">🛡️</div><span id="levelBadge" class="level-badge">Lv.1</span></div>
+        <div class="portrait-wrap"><div class="portrait"><img id="classPortrait" src="/assets/actors/warden_idle_1.svg" alt="角色立绘" /></div><span id="levelBadge" class="level-badge">Lv.1</span></div>
         <h3 id="playerNameLabel">旅者</h3><p id="classNameLabel" class="muted">铁誓守卫</p>
 
         <div class="bars">
@@ -74,9 +74,12 @@
 
       <section class="center-stage">
         <div id="scene" class="scene scene-hall">
+          <div id="envRear" class="env-layer env-rear"></div>
           <div class="scene-light"></div>
+          <div id="envMid" class="env-layer env-mid"></div>
           <div class="scene-vignette"></div><div class="mist mist-1"></div><div class="mist mist-2"></div>
           <div class="dust dust-a"></div><div class="dust dust-b"></div>
+          <div id="envFront" class="env-layer env-front"></div>
 
           <div class="scene-status">
             <span id="zoneLabel">外墓区</span>
@@ -84,7 +87,8 @@
           </div>
 
           <div id="sceneEntityLayer" class="scene-entity-layer">
-            <div id="playerActor" class="player-actor"><span id="playerActorIcon">🛡️</span><i></i></div>
+            <div id="npcStage" class="npc-stage"></div>
+            <div id="playerActor" class="player-actor"><img id="playerActorImg" src="/assets/actors/warden_idle_1.svg" alt="玩家角色" /><i></i></div>
           </div>
           <div id="vfxLayer" class="vfx-layer"></div>
           <div id="hotspotLayer" class="hotspot-layer"></div>
@@ -101,10 +105,20 @@
             <p id="eventDescription"></p>
           </div>
 
+          <div id="dialoguePanel" class="dialogue-panel hidden">
+            <div class="dialogue-portrait-wrap"><img id="dialoguePortrait" alt="NPC 立绘" /><span id="dialogueRelation">中立</span></div>
+            <div class="dialogue-copy"><small id="dialogueFaction">NPC</small><h3 id="dialogueName">人物</h3><b id="dialogueTitle"></b><p id="dialogueText"></p></div>
+          </div>
+
+          <div id="shopPanel" class="shop-panel hidden">
+            <div class="shop-head"><div class="shop-merchant"><img id="shopPortrait" src="/assets/portraits/npc_broker.svg" alt="商人"><div><small>TRADING POST</small><h3 id="shopName">商店</h3><p id="shopMerchantLabel">行商</p></div></div><div class="shop-gold">◈ <b id="shopGold">0</b></div></div>
+            <div id="shopContent" class="shop-content"></div>
+          </div>
+
           <div id="enemyStage" class="enemy-stage hidden">
             <div class="enemy-aura"></div>
             <div id="bossPhase" class="boss-phase hidden">PHASE I</div>
-            <div id="enemyIcon" class="enemy-icon">💀</div>
+            <img id="enemyPortrait" class="enemy-portrait" src="/assets/portraits/enemy_skeleton.svg" alt="敌人立绘" />
             <div class="enemy-info">
               <div class="enemy-title-row"><b id="enemyName">骨骸仆从</b><span id="enemyArchetype"></span></div>
               <p id="enemyDescription"></p>

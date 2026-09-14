@@ -305,3 +305,112 @@ func TestV04OuterGateRequiresCompassAndCanUnlockFinalRoom(t *testing.T) {
 		t.Fatal("successful gate interaction should persist its world flag")
 	}
 }
+
+func TestV05DialogueQuestAndRelationship(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Speaker", "ranger", 5050)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.CurrentRoomID = "room_13"
+	r.Rooms["room_13"].Discovered = true
+	r.Rooms["room_13"].Visited = true
+	if err := e.Interact(r, "npc_iven"); err != nil {
+		t.Fatal(err)
+	}
+	if r.ActiveDialogue == nil || r.ActiveDialogue.NPCID != "iven" {
+		t.Fatal("Iven dialogue should become active")
+	}
+	if err := e.DialogueChoice(r, "patrol"); err != nil {
+		t.Fatal(err)
+	}
+	if q := r.Quests["lost_patrol"]; q == nil || q.Status != "active" {
+		t.Fatal("dialogue choice should accept lost patrol quest")
+	}
+	if r.NPCRelations["iven"] != 2 {
+		t.Fatalf("expected Iven relationship +2, got %d", r.NPCRelations["iven"])
+	}
+	if r.ActiveDialogue == nil || r.ActiveDialogue.NodeID != "accept" {
+		t.Fatal("dialogue should advance to accept node")
+	}
+}
+
+func TestV05ShopBuyAndSell(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Trader", "warden", 5051)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.Gold = 200
+	if err := e.StartDialogue(r, "veil_broker"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.DialogueChoice(r, "trade"); err != nil {
+		t.Fatal(err)
+	}
+	if r.ActiveShop != "veil_market" {
+		t.Fatal("merchant dialogue should open veil market")
+	}
+	beforeStock := r.ShopStock["veil_market:healing_draught"]
+	beforeGold := r.Player.Gold
+	if err := e.ShopAction(r, "veil_market", "buy", "healing_draught"); err != nil {
+		t.Fatal(err)
+	}
+	if !hasItem(r.Player.Inventory, "healing_draught") || r.ShopStock["veil_market:healing_draught"] != beforeStock-1 || r.Player.Gold >= beforeGold {
+		t.Fatal("buy should update inventory, stock, and gold")
+	}
+	goldAfterBuy := r.Player.Gold
+	if err := e.ShopAction(r, "veil_market", "sell", "healing_draught"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.Gold <= goldAfterBuy {
+		t.Fatal("sell should award gold")
+	}
+	if r.ShopStock["veil_market:healing_draught"] != beforeStock {
+		t.Fatal("sold item should return to merchant stock")
+	}
+}
+
+func TestV05GrowthPointsAndMastery(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Grower", "seer", 5052)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.AttributePoints != 1 || r.Player.MasteryPoints != 1 {
+		t.Fatalf("new run should start with growth points, got attr=%d mastery=%d", r.Player.AttributePoints, r.Player.MasteryPoints)
+	}
+	oldWill := r.Player.Attributes.Will
+	if err := e.UpgradeAttribute(r, "will"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.Attributes.Will != oldWill+1 || r.Player.AttributePoints != 0 {
+		t.Fatal("attribute upgrade should consume point and increase stat")
+	}
+	oldHP := r.Player.MaxHP
+	if err := e.UpgradeGrowth(r, "survivor_instinct"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.Growth["survivor_instinct"] != 1 || r.Player.MaxHP != oldHP+3 || r.Player.MasteryPoints != 0 {
+		t.Fatal("survivor mastery should persist rank and increase max hp")
+	}
+}
+
+func TestV05SignatureMasteryReducesSkillCostAtRankThree(t *testing.T) {
+	e := NewEngine()
+	r, err := e.NewRun("Master", "seer", 5053)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Player.Growth["signature_mastery"] = 3
+	r.Player.Energy = r.Player.MaxEnergy
+	r.Player.Attributes.Will = 100
+	e.startCombat(r, "bone_thrall")
+	before := r.Player.Energy
+	if err := e.CombatAction(r, "skill"); err != nil {
+		t.Fatal(err)
+	}
+	if r.Player.Energy != before-2 {
+		t.Fatalf("rank-three signature mastery should cost 2 energy: got %d from %d", r.Player.Energy, before)
+	}
+}

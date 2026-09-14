@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="620" viewBox="0 0 420 620">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#10151b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+ <radialGradient id="halo"><stop stop-color="#776241" stop-opacity=".34"/><stop offset="1" stop-color="#776241" stop-opacity="0"/></radialGradient>
+ <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#202832"/><stop offset=".45" stop-color="#79808a"/><stop offset=".55" stop-color="#313945"/><stop offset="1" stop-color="#10151b"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<circle cx="210" cy="190" r="170" fill="url(#halo)"/>
+<path d="M0 525 C85 486 154 518 212 500 C292 475 342 500 420 468 V620 H0Z" fill="#030507"/>
+<ellipse cx="210" cy="555" rx="145" ry="32" fill="#000" opacity=".65"/><path d="M86 560 C98 393 130 315 167 285 H254 C294 322 326 405 339 560Z" fill="url(#metal)" stroke="#080a0d" stroke-width="8"/><path d="M142 181 Q210 112 279 181 L271 301 Q210 344 149 301Z" fill="url(#metal)" stroke="#11161c" stroke-width="8"/><path d="M158 213 H264 L257 246 H166Z" fill="#050709"/><g fill="#b8a273"><circle cx="180" cy="229" r="5"/><circle cx="241" cy="229" r="5"/></g><path d="M112 378 Q210 338 309 378" fill="none" stroke="#6c604b" stroke-width="8"/><path d="M139 396 L282 548" stroke="#15191d" stroke-width="18"/><path d="M139 396 L282 548" stroke="#8b7b5d" stroke-width="3"/><path d="M80 320 C40 390 47 483 95 527" stroke="#414a54" stroke-width="16" fill="none"/><path d="M340 321 C378 392 373 486 324 527" stroke="#414a54" stroke-width="16" fill="none"/><text x="210" y="586" fill="#d7d0c2" text-anchor="middle" font-family="serif" font-size="21" letter-spacing="2">奥 林</text><text x="210" y="608" fill="#8d887f" text-anchor="middle" font-family="sans-serif" font-size="11" letter-spacing="3">THE LAST BANNERLESS</text>
+<rect x="14" y="14" width="392" height="592" fill="none" stroke="#8c7b5d" stroke-opacity=".23"/>
+<path d="M32 46H108M312 46H388M32 574H108M312 574H388" stroke="#8c7b5d" stroke-opacity=".55" stroke-width="2"/>
+</svg>

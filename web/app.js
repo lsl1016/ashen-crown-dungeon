@@ -1,6 +1,6 @@
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => [...document.querySelectorAll(q)];
-const state = { world:null, snapshot:null, runId:null, selectedClass:'warden', busy:false, sound:true, audio:null, actorRoom:null };
+const state = { world:null, snapshot:null, runId:null, selectedClass:'warden', busy:false, sound:true, audio:null, actorRoom:null, actorMode:'idle', actorFrame:1, actorUntil:0, shopTab:'buy' };
 
 const roomIcons = {
   entrance:'⌂', combat:'⚔', event:'◈', treasure:'◇', npc:'♟', merchant:'¤', rest:'✦', shrine:'✧', boss:'♛',
@@ -15,7 +15,7 @@ const typeNames = {
   frontier:'雾外界碑', ashfield:'灰风平原', caravan:'停滞商队', glassmarsh:'镜砂洼地', crater:'坠星裂谷', starwatch:'反向观测台', windshrine:'无像风祠', meteor:'陨铁采掘场', ruins:'无旗骑士营', windcamp:'逐风营火', outergate:'外封印黑门', finalboss:'门后心室'
 };
 const attrNames = { strength:'力量', dexterity:'敏捷', perception:'感知', will:'意志' };
-const kindNames = { lore:'调查', event:'触发', loot:'搜寻', npc:'对话', object:'操作', secret:'机关', rest:'休整' };
+const kindNames = { lore:'调查', event:'触发', loot:'搜寻', npc:'对话', dialogue:'对话', object:'操作', secret:'机关', rest:'休整' };
 const slotNames = { weapon:'武器', armor:'护甲', trinket:'饰品' };
 const rarityNames = { common:'普通', uncommon:'精良', rare:'稀有', legendary:'传说' };
 const combatOnlyItems = new Set(['frost_salt','smoke_bomb','ember_flask','storm_phial']);
@@ -47,16 +47,19 @@ async function init(){
   $('#saveBtn').onclick = saveGame;
   $('#journalBtn').onclick = openJournal;
   $('#codexBtn').onclick = openCodex;
-  $('#talentBtn').onclick = openTalents;
+  $('#talentBtn').onclick = openGrowth;
   $('#soundBtn').onclick = toggleSound;
   $('#menuBtn').onclick = ()=>{ if(confirm('返回标题画面？当前 Run 已自动保存，手动存档需要点击右上角 ▣。')) location.reload(); };
   $('#closeModal').onclick = closeModal;
   $('.modal-backdrop').onclick = closeModal;
   document.addEventListener('keydown', handleHotkeys);
+  setInterval(tickActorAnimation, 190);
+  $('#scene').addEventListener('mousemove', sceneParallax);
+  $('#scene').addEventListener('mouseleave', ()=>{const sc=$('#scene');['--parallax-x','--parallax-mid','--parallax-front'].forEach(v=>sc.style.removeProperty(v));});
 }
 
 function renderClasses(){
-  $('#classCards').innerHTML = state.world.classes.map(c=>`<article class="class-card ${c.id===state.selectedClass?'active':''}" data-class="${c.id}"><div class="class-top"><span class="class-ico">${c.icon}</span><div><b>${escapeHtml(c.name)}</b><small>生命 ${c.hp} · 防御 ${c.defense} · 能量 ${c.energy}</small></div></div><p>${escapeHtml(c.description)}<br><span style="color:#a08a5d">职业技：${escapeHtml(c.skillName)}</span></p></article>`).join('');
+  $('#classCards').innerHTML = state.world.classes.map(c=>`<article class="class-card ${c.id===state.selectedClass?'active':''}" data-class="${c.id}"><div class="class-preview"><img src="${actorFramePath(c.id,'idle',1)}" alt="${escapeHtml(c.name)}"></div><div class="class-top"><span class="class-ico">${c.icon}</span><div><b>${escapeHtml(c.name)}</b><small>生命 ${c.hp} · 防御 ${c.defense} · 能量 ${c.energy}</small></div></div><p>${escapeHtml(c.description)}<br><span style="color:#a08a5d">职业技：${escapeHtml(c.skillName)}</span></p></article>`).join('');
   $$('.class-card').forEach(el=>el.onclick=()=>{state.selectedClass=el.dataset.class;renderClasses();});
 }
 
@@ -67,7 +70,7 @@ async function createGame(){
     const seedRaw=$('#seedInput').value.trim();
     const seed=seedRaw?Number(seedRaw):Math.floor(Date.now()/1000);
     const snap=await api('/api/runs',{method:'POST',body:JSON.stringify({name,class:state.selectedClass,seed})});
-    startSnapshot(snap); toast('V0.4 世界已建立 · 第一幕：沉眠墓城'); sfx('start');
+    startSnapshot(snap); toast('V0.5 世界已建立 · 角色成长与 NPC 系统已启用'); sfx('start');
   }catch(e){toast(e.message)}finally{state.busy=false}
 }
 function startSnapshot(snap){
@@ -81,12 +84,12 @@ function render(){
   const {run,items}=state.snapshot, p=run.player, room=run.rooms[run.currentRoomId];
   if(!p.equipment) p.equipment={}; if(!p.talents)p.talents={};
   const cls=state.world.classes.find(c=>c.id===p.class)||state.world.classes[0];
-  $('#playerNameLabel').textContent=p.name; $('#classNameLabel').textContent=cls.name; $('#classIcon').textContent=cls.icon; $('#levelBadge').textContent=`Lv.${p.level}`;
+  $('#playerNameLabel').textContent=p.name; $('#classNameLabel').textContent=cls.name; $('#classPortrait').src=actorFramePath(p.class,'idle',1); $('#levelBadge').textContent=`Lv.${p.level}`;
   $('#seedLabel').textContent=run.seed; $('#bellLabel').textContent=`${roman(run.clock?.bell||1)} / XIII`; $('#roomBreadcrumb').textContent=`${room.zone||'墓城'} / ${room.name}`; $('#turnLabel').textContent=`TURN ${run.turn}`;
-  $('#talentPointBadge').textContent=p.talentPoints||0; $('#talentPointBadge').classList.toggle('empty',!(p.talentPoints>0));
+  const growthPoints=(p.talentPoints||0)+(p.attributePoints||0)+(p.masteryPoints||0); $('#talentPointBadge').textContent=growthPoints; $('#talentPointBadge').classList.toggle('empty',!(growthPoints>0));
   setBar('#hpBar',p.hp,p.maxHp); setBar('#energyBar',p.energy,p.maxEnergy); const xpNeed=p.level*40; setBar('#xpBar',p.xp,xpNeed);
   $('#hpText').textContent=`${p.hp} / ${p.maxHp}`; $('#energyText').textContent=`${p.energy} / ${p.maxEnergy}`; $('#xpText').textContent=`${p.xp} / ${xpNeed}`; $('#goldLabel').textContent=p.gold;
-  $('#statsGrid').innerHTML=[['力量',p.attributes.strength],['敏捷',p.attributes.dexterity],['感知',p.attributes.perception],['意志',p.attributes.will],['防御',p.defense],['天赋点',p.talentPoints||0]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('#statsGrid').innerHTML=[['力量',p.attributes.strength],['敏捷',p.attributes.dexterity],['感知',p.attributes.perception],['意志',p.attributes.will],['防御',p.defense],['成长点',(p.attributePoints||0)+(p.masteryPoints||0)+(p.talentPoints||0)]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
   renderEquipment(items,p); renderInventory(items,p); renderScene(room,run); renderStory(run); renderContext(run,room); renderActions(run,room); renderMap(run); renderNearby(run); renderQuests(run); renderProverb(run); renderWorldPulse(run);
 }
 function setBar(sel,v,max){ const el=$(sel); if(el)el.style.width=`${Math.max(0,Math.min(100,max?((v/max)*100):0))}%`; }
@@ -127,33 +130,34 @@ function elementState(run,room,el){
 }
 
 function renderScene(room,run){
-  const scene=$('#scene'); scene.className=`scene scene-${room.scene} threat-${Math.min(4,run.clock?.threat||0)}`;
-  renderPlayerActor(room,run);
+  const scene=$('#scene'); scene.className=`scene scene-${room.scene} threat-${Math.min(4,run.clock?.threat||0)} zone-${room.id>='room_33'?'waste':'tomb'}`;
+  renderEnvironment(room,run); renderPlayerActor(room,run); renderSceneNPCs(room,run); renderDialoguePanel(run); renderShopPanel(run);
   $('#zoneLabel').textContent=room.zone||'墓城'; $('#roomTypeLabel').textContent=run.activeEvent?run.activeEvent.title:(typeNames[room.type]||room.type);
   $('#roomTitle').textContent=room.name; $('#roomDescription').textContent=run.activeEvent?run.activeEvent.description:room.description;
   const eventCard=$('#eventCard');
   if(run.activeEvent){ eventCard.classList.remove('hidden'); $('#eventTitle').textContent=run.activeEvent.title; $('#eventDescription').textContent=run.activeEvent.description; } else eventCard.classList.add('hidden');
 
-  const canInteract=!run.combat&&!run.activeEvent&&!run.gameOver; let available=0, lockedCount=0;
+  const canInteract=!run.combat&&!run.activeEvent&&!run.activeDialogue&&!run.activeShop&&!run.gameOver; let available=0, lockedCount=0;
   $('#hotspotLayer').innerHTML=(room.elements||[]).map(el=>{
     const st=elementState(run,room,el); if(!st.visible)return ''; if(!st.done)available++; if(st.locked&&!st.done)lockedCount++;
+    if(el.action==='dialogue') return '';
     const clickable=canInteract&&!st.locked; const check=el.check?` · ${attrNames[el.check.attribute]} DC${el.check.dc}`:'';
     return `<div class="hotspot ${escapeHtml(el.kind)} ${st.done?'done':''} ${st.locked?'locked':''}" style="left:${el.x}%;top:${el.y}%" ${clickable?`data-interact="${el.id}"`:''} title="${escapeHtml(st.reason||el.description)}${check}"><span class="hotspot-pin">${st.done?'✓':st.locked?'🔒':escapeHtml(el.icon)}</span><span class="hotspot-label">${escapeHtml(el.label)}${el.check?` <i>DC${el.check.dc}</i>`:''}</span></div>`;
   }).join('');
-  $('#interactionCounter').textContent=run.combat?'战斗中':run.activeEvent?'事件处理中':`${available} 个目标${lockedCount?` · ${lockedCount} 个受条件限制`:''}`;
+  $('#interactionCounter').textContent=run.combat?'战斗中':run.activeEvent?'事件处理中':run.activeDialogue?'对话中':run.activeShop?'交易中':`${available} 个目标${lockedCount?` · ${lockedCount} 个受条件限制`:''}`;
   $$('[data-interact]').forEach(el=>el.onclick=()=>interact(el.dataset.interact));
 
   const es=$('#enemyStage');
   if(run.combat){
     es.classList.remove('hidden'); const enemy=state.snapshot.enemies[run.combat.enemyId], intent=run.combat.intent||{};
-    $('#enemyIcon').textContent=enemy?.icon||'☠'; $('#enemyName').textContent=run.combat.enemyName; $('#enemyDescription').textContent=enemy?.description||''; $('#enemyArchetype').textContent=`${enemy?.archetype||'敌人'} · 弱点 ${enemy?.weakness||'未知'}`;
+    const portrait=$('#enemyPortrait'); portrait.src=enemy?.portrait||'/assets/portraits/enemy_skeleton.svg'; portrait.className=`enemy-portrait intent-${escapeHtml(intent.kind||'attack')} ${enemy?.boss?'boss':''}`;
+    $('#enemyName').textContent=run.combat.enemyName; $('#enemyDescription').textContent=enemy?.description||''; $('#enemyArchetype').textContent=`${enemy?.archetype||'敌人'} · 弱点 ${enemy?.weakness||'未知'}`;
     $('#enemyHpText').textContent=`${Math.max(0,run.combat.enemyHp)} / ${run.combat.enemyMaxHp}`; setBar('#enemyHpBar',Math.max(0,run.combat.enemyHp),run.combat.enemyMaxHp);
     $('#intentIcon').textContent=intent.icon||'⚔'; $('#intentLabel').textContent=intent.label||'未知意图'; $('#intentDescription').textContent=`${intent.description||''}${intent.telegraph?` · ${intent.telegraph}`:''}`;
     $('#enemyStatuses').innerHTML=(run.combat.enemyStatuses||[]).map(s=>`<span class="status-chip enemy">${escapeHtml(s.name)} ${s.rounds}</span>`).join('') || '<span class="status-empty">无异常状态</span>';
     const phase=$('#bossPhase'); if(enemy?.boss){phase.classList.remove('hidden');phase.textContent=`PHASE ${roman(run.combat.bossPhase||1)}`}else phase.classList.add('hidden');
   } else es.classList.add('hidden');
 }
-
 function renderStory(run){
   const logs=run.log.slice(-24);
   $('#storyFeed').innerHTML=logs.map((l,i)=>`<div class="story-line ${l.type} ${i===logs.length-1?'latest':''}"><small>${String(l.turn).padStart(2,'0')}</small>${escapeHtml(l.message)}</div>`).join('');
@@ -161,16 +165,17 @@ function renderStory(run){
 }
 function renderContext(run,room){
   const box=$('#contextBar');
+  if(run.activeDialogue){const d=currentDialogue(run);box.innerHTML=d?`<span class="context-chip npc">♟ ${escapeHtml(d.npc.name)} · ${escapeHtml(d.npc.faction)}</span><span class="context-chip">关系 ${relationshipText(run.npcRelations?.[d.npc.id]||0)} ${run.npcRelations?.[d.npc.id]||0}</span>`:'<span class="context-chip">对话中</span>';return;}
+  if(run.activeShop){const shop=state.world.shops?.[run.activeShop];box.innerHTML=`<span class="context-chip shop">¤ ${escapeHtml(shop?.name||'交易')}</span><span class="context-chip">古金币 ${run.player.gold}</span><span class="context-chip">买卖会立即写入存档状态</span>`;return;}
   if(run.combat){
     const intent=run.combat.intent||{}; const ps=(run.combat.playerStatuses||[]).map(s=>`${s.name} ${s.rounds}`).join(' · ');
     box.innerHTML=`<span class="context-chip intent">${intent.icon||'⚔'} 下一步：${escapeHtml(intent.label||'未知')}</span><span class="context-chip">${escapeHtml(intent.telegraph||'观察敌人动作决定应对方式')}</span>${ps?`<span class="context-chip debuff">自身状态：${escapeHtml(ps)}</span>`:''}`; return;
   }
   if(run.activeEvent){box.innerHTML=`<span class="context-chip">◈ ${escapeHtml(run.activeEvent.title)}</span><span class="context-chip">选择会永久写入本次世界状态</span>`;return;}
   const els=(room.elements||[]).map(el=>({el,st:elementState(run,room,el)})).filter(x=>x.st.visible);
-  box.innerHTML=els.length?els.map(({el,st})=>`<button class="context-chip ${st.done?'done':''} ${st.locked&&!st.done?'locked':''}" ${st.done||st.locked?'disabled':`data-context-interact="${el.id}"`}>${st.done?'✓':st.locked?'🔒':'◌'} ${escapeHtml(el.label)}${st.locked&&!st.done?` · ${escapeHtml(st.reason)}`:''}</button>`).join(''):'<span class="context-chip">这里没有明显可调查目标</span>';
+  box.innerHTML=els.length?els.map(({el,st})=>`<button class="context-chip ${st.done?'done':''} ${st.locked&&!st.done?'locked':''}" ${st.done||st.locked?'disabled':`data-context-interact="${el.id}"`}>${st.done?'✓':st.locked?'🔒':el.action==='dialogue'?'♟':'◌'} ${escapeHtml(el.label)}${st.locked&&!st.done?` · ${escapeHtml(st.reason)}`:''}</button>`).join(''):'<span class="context-chip">这里没有明显可调查目标</span>';
   $$('[data-context-interact]').forEach(b=>b.onclick=()=>interact(b.dataset.contextInteract));
 }
-
 function adjacentRooms(run){
   const ids=[]; for(const e of run.edges){if(e.from===run.currentRoomId)ids.push(e.to);else if(e.to===run.currentRoomId)ids.push(e.from)}
   return [...new Set(ids)].map(id=>run.rooms[id]).filter(Boolean);
@@ -178,10 +183,17 @@ function adjacentRooms(run){
 function renderActions(run,room){
   const box=$('#actionArea');
   if(run.gameOver){box.innerHTML=`<button class="action-btn primary" onclick="location.reload()">${run.victory?'完成冒险 · 返回标题':'重新开始'}</button><span class="action-hint">${run.victory?'墓城的命运已经改变。':'你的旅程停在了这里。'}</span>`;return;}
+  if(run.activeDialogue){
+    const d=currentDialogue(run); if(!d){box.innerHTML='<span class="action-hint">对话状态异常</span>';return;}
+    let hotkey=1; const buttons=d.node.choices.map(c=>{const lock=dialogueChoiceLock(run,c);return `<button class="action-btn dialogue-choice ${c.openShop?'trade':''}" ${lock?`disabled title="${escapeHtml(lock)}"`:`data-dialogue-choice="${c.id}" data-hotkey="${hotkey++}"`}><kbd>${Math.min(9,hotkey-1)}</kbd>${c.openShop?'¤ ':''}${escapeHtml(c.text)}${lock?` · ${escapeHtml(lock)}`:''}</button>`}).join('');
+    box.innerHTML=buttons+`<button class="action-btn ghost" data-dialogue-close>结束对话</button><span class="action-hint">关系 ${relationshipText(run.npcRelations?.[d.npc.id]||0)} · 你的选择会影响任务与世界事实</span>`;
+    $$('[data-dialogue-choice]').forEach(b=>b.onclick=()=>dialogueChoice(b.dataset.dialogueChoice)); $('[data-dialogue-close]').onclick=closeDialogue; return;
+  }
+  if(run.activeShop){box.innerHTML=`<button class="action-btn primary" data-shop-tab="buy">购买</button><button class="action-btn" data-shop-tab="sell">出售</button><button class="action-btn ghost" data-shop-close>结束交易</button><span class="action-hint">古金币 ${run.player.gold} · 关键剧情物品不可出售</span>`;$$('[data-shop-tab]').forEach(b=>b.onclick=()=>{state.shopTab=b.dataset.shopTab;renderShopPanel(run)});$('[data-shop-close]').onclick=closeShop;return;}
   if(run.combat){
-    const cls=state.world.classes.find(c=>c.id===run.player.class), skill=cls?.skillName||'职业技', cd=run.combat.cooldowns?.skill||0;
+    const cls=state.world.classes.find(c=>c.id===run.player.class), skill=cls?.skillName||'职业技', cd=run.combat.cooldowns?.skill||0, skillCost=(run.player.growth?.signature_mastery||0)>=3?2:3;
     const potion=countItem(run,'healing_draught');
-    box.innerHTML=`<button class="action-btn primary" data-combat="attack" data-hotkey="1"><kbd>1</kbd>⚔ 普通攻击</button><button class="action-btn" data-combat="skill" data-hotkey="2" ${cd>0||run.player.energy<3?'disabled':''} title="${escapeHtml(cls?.skillDescription||'')}"><kbd>2</kbd>✦ ${escapeHtml(skill)} ${cd>0?`· 冷却 ${cd}`:'· 3 能量'}</button><button class="action-btn" data-combat="guard" data-hotkey="3"><kbd>3</kbd>⛨ 防御</button><button class="action-btn" data-combat="potion" data-hotkey="4" ${potion<=0?'disabled':''}><kbd>4</kbd>🧪 药剂 ×${potion}</button><button class="action-btn danger" data-combat="flee" data-hotkey="5"><kbd>5</kbd>↶ 撤退</button><span class="action-hint">ROUND ${run.combat.round+1} · 先看敌人意图再行动</span>`;
+    box.innerHTML=`<button class="action-btn primary" data-combat="attack" data-hotkey="1"><kbd>1</kbd>⚔ 普通攻击</button><button class="action-btn" data-combat="skill" data-hotkey="2" ${cd>0||run.player.energy<skillCost?'disabled':''} title="${escapeHtml(cls?.skillDescription||'')}"><kbd>2</kbd>✦ ${escapeHtml(skill)} ${cd>0?`· 冷却 ${cd}`:`· ${skillCost} 能量`}</button><button class="action-btn" data-combat="guard" data-hotkey="3"><kbd>3</kbd>⛨ 防御</button><button class="action-btn" data-combat="potion" data-hotkey="4" ${potion<=0?'disabled':''}><kbd>4</kbd>🧪 药剂 ×${potion}</button><button class="action-btn danger" data-combat="flee" data-hotkey="5"><kbd>5</kbd>↶ 撤退</button><span class="action-hint">ROUND ${run.combat.round+1} · 先看敌人意图再行动</span>`;
     $$('[data-combat]').forEach(b=>b.onclick=()=>combatAction(b.dataset.combat)); return;
   }
   if(run.activeEvent){
@@ -191,20 +203,19 @@ function renderActions(run,room){
   const els=(room.elements||[]).map(el=>({el,st:elementState(run,room,el)})).filter(x=>x.st.visible&&!x.st.done);
   const nearby=adjacentRooms(run).filter(r=>r.discovered);
   let hotkey=1, html='';
-  for(const {el,st} of els.slice(0,4)){
+  for(const {el,st} of els.slice(0,5)){
     if(st.locked){html+=`<button class="action-btn locked" disabled>🔒 ${escapeHtml(el.label)} · ${escapeHtml(st.reason)}</button>`;continue;}
-    html+=`<button class="action-btn" data-action-interact="${el.id}" data-hotkey="${hotkey}"><kbd>${hotkey++}</kbd>${kindNames[el.kind]||'调查'} · ${escapeHtml(el.label)}${el.check?` · DC${el.check.dc}`:''}</button>`;
+    html+=`<button class="action-btn ${el.action==='dialogue'?'npc-action':''}" data-action-interact="${el.id}" data-hotkey="${hotkey}"><kbd>${hotkey++}</kbd>${el.action==='dialogue'?'♟ 对话':kindNames[el.kind]||'调查'} · ${escapeHtml(el.label)}${el.check?` · DC${el.check.dc}`:''}</button>`;
   }
   for(const r of nearby){
     if(r.locked){html+=`<button class="action-btn locked" disabled>🔒 ${escapeHtml(r.visited?r.name:(typeNames[r.type]||'未知道路'))}</button>`;continue;}
     html+=`<button class="action-btn travel" data-move="${r.id}" data-hotkey="${hotkey}"><kbd>${hotkey++}</kbd>→ 前往 ${escapeHtml(r.visited?r.name:(typeNames[r.type]||'未知地点'))}</button>`;
   }
-  html+=`<span class="action-hint">条件机关会明确显示需要的钥匙、线索或检定</span>`; box.innerHTML=html;
+  html+=`<span class="action-hint">V0.5 · NPC、交易、任务与成长均由真实 Run 状态驱动</span>`; box.innerHTML=html;
   $$('[data-action-interact]').forEach(b=>b.onclick=()=>interact(b.dataset.actionInteract)); $$('[data-move]').forEach(b=>b.onclick=()=>moveTo(b.dataset.move));
 }
-
 async function chooseEvent(id){ sfx('interact'); await perform(`/api/runs/${state.runId}/action`,{choiceId:id},true,'event'); }
-async function combatAction(action){ if(action==='skill')actorEmote('cast');else if(action==='guard')actorEmote('guard'); sfx(action==='skill'?'skill':action==='guard'?'guard':'attack'); await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
+async function combatAction(action){ if(action==='skill')actorEmote('cast');else if(action==='guard')actorEmote('guard');else if(action==='attack')actorEmote('attack'); sfx(action==='skill'?'skill':action==='guard'?'guard':'attack'); await perform(`/api/runs/${state.runId}/combat`,{action},true,'combat'); }
 async function itemAction(itemId,action){ sfx(action==='equip'?'equip':'item'); await perform(`/api/runs/${state.runId}/item`,{itemId,action},false,'item'); }
 async function interact(elementId){
   const run=state.snapshot.run, room=run.rooms[run.currentRoomId], el=(room.elements||[]).find(x=>x.id===elementId);
@@ -212,7 +223,7 @@ async function interact(elementId){
   sfx('interact');
   await perform(`/api/runs/${state.runId}/interact`,{elementId},true,'interact');
 }
-async function moveTo(roomId){ const run=state.snapshot.run;if(run.combat||run.activeEvent||run.gameOver||state.busy)return;sfx('move');await perform(`/api/runs/${state.runId}/move`,{roomId},false,'move'); }
+async function moveTo(roomId){ const run=state.snapshot.run;if(run.combat||run.activeEvent||run.activeDialogue||run.activeShop||run.gameOver||state.busy)return;sfx('move');await perform(`/api/runs/${state.runId}/move`,{roomId},false,'move'); }
 
 async function perform(url,payload,showDice,kind){
   if(state.busy)return; state.busy=true;
@@ -226,9 +237,9 @@ async function perform(url,payload,showDice,kind){
     const now=snap.run, nowRoom=now.rooms[now.currentRoomId];
     if(oldEnemyHP!=null){
       const nextEnemyHP=now.combat?.enemyHp ?? 0, delta=Math.max(0,oldEnemyHP-nextEnemyHP);
-      if(delta>0){pulseClass('#scene','scene-hit',500);spawnFloat('enemy',`-${delta}`,now.lastRoll?.critical?'crit':'damage');spawnVfx(kind==='combat'?'slash':'burst','enemy');sfx(now.lastRoll?.critical?'crit':'hit');}
+      if(delta>0){pulseClass('#scene','scene-hit',500);spawnFloat('enemy',`-${delta}`,now.lastRoll?.critical?'crit':'damage');if(kind==='combat'&&payload.action==='skill')spawnSkillVfx(now.player.class);else spawnVfx(kind==='combat'?'slash':'burst','enemy');sfx(now.lastRoll?.critical?'crit':'hit');}
     }
-    if(oldHP!=null&&now.player.hp<oldHP){const d=oldHP-now.player.hp;pulseClass('#scene','screen-shake',360);actorEmote('hit');spawnFloat('player',`-${d}`,'damage');sfx('hurt');}
+    if(oldHP!=null&&now.player.hp<oldHP){const d=oldHP-now.player.hp;pulseClass('#scene','screen-shake',360);enemyEmote();actorEmote('hit');spawnFloat('player',`-${d}`,'damage');sfx('hurt');}
     if(oldHP!=null&&now.player.hp>oldHP){spawnFloat('player',`+${now.player.hp-oldHP}`,'heal');sfx('heal');}
     if(oldEnergy!=null&&now.player.energy>oldEnergy&&kind!=='move'){spawnFloat('player',`+${now.player.energy-oldEnergy} EN`,'energy');}
     if(!oldCombat&&now.combat){pulseClass('#scene','combat-start',520);if(state.snapshot.enemies[now.combat.enemyId]?.boss){await showCinematic(now.combat.enemyId==='gate_heart'?'FINAL ENCOUNTER':'BOSS ENCOUNTER',now.combat.enemyName,state.snapshot.enemies[now.combat.enemyId]?.description||'', 'boss',1100);sfx('boss');}}
@@ -270,7 +281,7 @@ function renderNearby(run){
   $$('[data-nearby]').forEach(n=>n.onclick=()=>moveTo(n.dataset.nearby));
 }
 function renderQuests(run){
-  const qs=Object.values(run.quests);$('#questList').innerHTML=qs.map(q=>`<div class="quest ${q.status==='completed'?'completed':''}"><b>${q.status==='completed'?'✓ ':''}${escapeHtml(q.title)}</b><p>${escapeHtml(q.description)}</p><small>${q.status==='completed'?'已完成':`${q.progress} / ${q.goal}`}</small></div>`).join('');
+  const qs=Object.values(run.quests);$('#questList').innerHTML=qs.map(q=>`<div class="quest ${q.status==='completed'?'completed':''} ${q.status==='failed'?'failed':''}"><b>${q.status==='completed'?'✓ ':q.status==='failed'?'× ':q.title.includes('主线')?'♛ ':'◇ '}${escapeHtml(q.title)}</b><p>${escapeHtml(q.description)}</p><small>${q.status==='completed'?'已完成':q.status==='failed'?'已失败':`进行中 · ${q.progress} / ${q.goal}`}</small></div>`).join('')||'<p class="muted" style="font-size:9px">暂无进行中的任务。</p>';
 }
 function renderWorldPulse(run){
   const c=run.clock||{bell:1,threat:0,lastChange:'第一声钟已经结束。'};$('#worldThreat').textContent=`威胁 ${c.threat||0} · 第 ${c.bell||1} 钟`;$('#worldChange').textContent=c.lastChange||'墓城暂时保持沉默。';
@@ -285,31 +296,41 @@ async function openSaves(){
 }
 function openJournal(){if(!state.snapshot)return;const run=state.snapshot.run;showModal(`<h2>冒险日志</h2><div class="log-list">${run.log.slice().reverse().map(l=>`<div><b>#${l.turn}</b> <span style="color:#777">[${escapeHtml(l.type)}]</span> ${escapeHtml(l.message)}</div>`).join('')}</div>`)}
 function openCodex(){if(!state.snapshot)return;const lore=state.snapshot.run.lore||[];showModal(`<h2>发现档案 <small style="font-size:10px;color:#696f76">${lore.length} 条</small></h2><div class="codex-list">${lore.length?lore.map(x=>`<article class="codex-item"><b>${escapeHtml(x.title)}</b><p>${escapeHtml(x.text)}</p></article>`).join(''):'<p class="muted">还没有发现任何档案。调查碑文、病历、判决、笔记与遗物可以解锁。</p>'}</div>`)}
-function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.4 把赫里昂改为第一幕 Boss。击败他会打开雾外荒原，世界地图扩展到 44 个地点；最终结局发生在第二幕黑门之后。</p></div>`)}
-function openTalents(){
-  if(!state.snapshot)return;const run=state.snapshot.run,p=run.player,cls=state.world.classes.find(c=>c.id===p.class);const talents=(state.world.talents||[]).filter(t=>t.class===p.class);
-  showModal(`<h2>${escapeHtml(cls?.name||'职业')} · 天赋 <small style="font-size:10px;color:#c5a45d">可用 ${p.talentPoints||0} 点</small></h2><div class="talent-grid">${talents.map(t=>{const rank=p.talents?.[t.id]||0,learned=rank>=t.maxRank;return `<article class="talent-card ${learned?'learned':''}"><span class="talent-icon">${t.icon}</span><div><b>${escapeHtml(t.name)}</b><p>${escapeHtml(t.description)}</p><small>${learned?'已学习':`${rank} / ${t.maxRank}`}</small></div>${learned?'':`<button class="mini-btn" data-talent="${t.id}" ${(p.talentPoints||0)<=0?'disabled':''}>学习</button>`}</article>`}).join('')}</div><p class="muted" style="font-size:9px">每次升级获得 1 点天赋点。天赋会直接改变战斗结算，不只是文字说明。</p>`);
-  $$('[data-talent]').forEach(b=>b.onclick=()=>learnTalent(b.dataset.talent));
+function openWorld(){const w=state.world;showModal(`<h2>${escapeHtml(w.title)}</h2><div class="world-info"><p>${escapeHtml(w.premise)}</p><div class="world-grid"><section class="world-box"><h3>时代</h3><p>${escapeHtml(w.era)}</p></section><section class="world-box"><h3>已知势力</h3><ul>${w.factions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section></div><p class="muted">V0.5 保留双幕 44 地点战役，并加入持久 NPC、分支对话、关系值、真实商店库存、任务接受/拒绝，以及属性 / 精通 / 职业天赋三层角色成长。</p></div>`)}
+function openGrowth(){
+  if(!state.snapshot)return; const run=state.snapshot.run,p=run.player,cls=state.world.classes.find(c=>c.id===p.class); const talents=(state.world.talents||[]).filter(t=>t.class===p.class); const growth=state.world.growth||[];
+  const attrCards=Object.entries(attrNames).map(([id,name])=>`<article class="growth-card attribute"><span>${name}</span><b>${p.attributes[id]}</b><button class="mini-btn" data-grow-attr="${id}" ${(p.attributePoints||0)<=0?'disabled':''}>+1</button></article>`).join('');
+  const masteryCards=growth.map(g=>{const rank=p.growth?.[g.id]||0;return `<article class="mastery-card"><span class="talent-icon">${g.icon}</span><div><b>${escapeHtml(g.name)}</b><p>${escapeHtml(g.description)}</p><div class="rank-pips">${Array.from({length:g.maxRank},(_,i)=>`<i class="${i<rank?'on':''}"></i>`).join('')}</div></div><button class="mini-btn" data-grow-mastery="${g.id}" ${(p.masteryPoints||0)<=0||rank>=g.maxRank?'disabled':''}>训练</button></article>`}).join('');
+  const talentCards=talents.map(t=>{const rank=p.talents?.[t.id]||0,learned=rank>=t.maxRank;return `<article class="talent-card ${learned?'learned':''}"><span class="talent-icon">${t.icon}</span><div><b>${escapeHtml(t.name)}</b><p>${escapeHtml(t.description)}</p><small>${learned?'已学习':`${rank} / ${t.maxRank}`}</small></div>${learned?'':`<button class="mini-btn" data-talent="${t.id}" ${(p.talentPoints||0)<=0?'disabled':''}>学习</button>`}</article>`}).join('');
+  showModal(`<div class="growth-modal"><div class="growth-hero"><img src="${actorFramePath(p.class,'idle',1)}"><div><small>CHARACTER DEVELOPMENT</small><h2>${escapeHtml(p.name)} · ${escapeHtml(cls?.name||'职业')}</h2><p>等级 ${p.level} · 属性点 <b>${p.attributePoints||0}</b> · 精通点 <b>${p.masteryPoints||0}</b> · 天赋点 <b>${p.talentPoints||0}</b></p></div></div><h3 class="modal-section-title">基础属性</h3><div class="attribute-growth-grid">${attrCards}</div><h3 class="modal-section-title">战斗精通</h3><div class="mastery-grid">${masteryCards}</div><h3 class="modal-section-title">${escapeHtml(cls?.name||'职业')}天赋</h3><div class="talent-grid">${talentCards}</div></div>`);
+  $$('[data-grow-attr]').forEach(b=>b.onclick=()=>upgradeGrowth('attribute',b.dataset.growAttr)); $$('[data-grow-mastery]').forEach(b=>b.onclick=()=>upgradeGrowth('mastery',b.dataset.growMastery)); $$('[data-talent]').forEach(b=>b.onclick=()=>learnTalent(b.dataset.talent));
 }
 async function learnTalent(id){
-  if(state.busy)return;state.busy=true;try{state.snapshot=await api(`/api/runs/${state.runId}/talent`,{method:'POST',body:JSON.stringify({talentId:id})});render();openTalents();toast('天赋已学习')}catch(e){toast(e.message)}finally{state.busy=false}
+  if(state.busy)return;state.busy=true;try{state.snapshot=await api(`/api/runs/${state.runId}/talent`,{method:'POST',body:JSON.stringify({talentId:id})});render();openGrowth();toast('天赋已学习')}catch(e){toast(e.message)}finally{state.busy=false}
 }
 function showModal(html){$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
 function handleHotkeys(e){if(e.key==='Escape'&&!$('#modal').classList.contains('hidden')){closeModal();return}if(!state.snapshot||state.busy||!$('#modal').classList.contains('hidden'))return;if(/^[1-9]$/.test(e.key)){const target=document.querySelector(`[data-hotkey="${e.key}"]`);if(target&&!target.disabled){e.preventDefault();target.click()}}}
 
 
+function actorFramePath(cls,mode,frame){return `/assets/actors/${cls||'warden'}_${mode||'idle'}_${frame||1}.svg`;}
 function renderPlayerActor(room,run){
-  const actor=$('#playerActor'), icon=$('#playerActorIcon'); if(!actor||!icon)return;
-  const cls=state.world.classes.find(c=>c.id===run.player.class); icon.textContent=cls?.icon||'◆';
+  const actor=$('#playerActor'), img=$('#playerActorImg'); if(!actor||!img)return;
+  if(!state.actorMode)state.actorMode='idle'; img.src=actorFramePath(run.player.class,state.actorMode,state.actorFrame||1);
   if(state.actorRoom!==room.id){state.actorRoom=room.id;setActorPosition(run.combat?18:16,run.combat?74:76,false);}
   actor.classList.toggle('in-combat',!!run.combat);
+}
+function tickActorAnimation(){
+  if(!state.snapshot)return; const now=performance.now(); if(state.actorMode!=='idle'&&now>state.actorUntil){state.actorMode='idle';state.actorFrame=1;}
+  state.actorFrame=(state.actorFrame%4)+1; const img=$('#playerActorImg'); if(img)img.src=actorFramePath(state.snapshot.run.player.class,state.actorMode,state.actorFrame);
 }
 function setActorPosition(x,y,animate=true){const a=$('#playerActor');if(!a)return;if(!animate)a.style.transition='none';a.style.left=`${Math.max(8,Math.min(88,x))}%`;a.style.top=`${Math.max(24,Math.min(82,y))}%`;if(!animate){requestAnimationFrame(()=>a.style.transition='');}}
 async function approachElement(el){
   const actor=$('#playerActor');if(!actor)return;actor.classList.add('moving');setActorPosition(Math.max(12,Math.min(82,(el.x||50)-8)),Math.max(35,Math.min(78,(el.y||55)+10)),true);await new Promise(r=>setTimeout(r,380));actor.classList.remove('moving');
 }
-function actorEmote(kind){const a=$('#playerActor');if(!a)return;a.classList.remove('cast','hit','guard');void a.offsetWidth;a.classList.add(kind);setTimeout(()=>a.classList.remove(kind),650);}
+function actorEmote(kind){const a=$('#playerActor');if(!a)return;a.classList.remove('cast','hit','guard','attack');void a.offsetWidth;const mode=kind==='cast'?'cast':kind==='attack'?'attack':'idle';state.actorMode=mode;state.actorFrame=1;state.actorUntil=performance.now()+(kind==='cast'?900:kind==='attack'?720:450);a.classList.add(kind);setTimeout(()=>a.classList.remove(kind),700);}
+function sceneParallax(ev){const scene=$('#scene');if(!scene)return;const r=scene.getBoundingClientRect(),x=(ev.clientX-r.left)/r.width-.5;scene.style.setProperty('--parallax-x',`${x*12}px`);scene.style.setProperty('--parallax-mid',`${x*-5}px`);scene.style.setProperty('--parallax-front',`${x*8}px`);}
+
 function spawnFloat(target,text,kind='damage'){
   const layer=$('#vfxLayer');if(!layer)return;const el=document.createElement('div');el.className=`float-number ${kind}`;el.textContent=text;
   if(target==='enemy'){el.style.left='77%';el.style.top='43%';}else{const a=$('#playerActor');el.style.left=a?.style.left||'18%';el.style.top=a?.style.top||'73%';}
@@ -319,9 +340,48 @@ function spawnVfx(type,target='enemy'){
   const layer=$('#vfxLayer');if(!layer)return;const el=document.createElement('div');el.className=type==='burst'?'vfx-burst':type==='guard'?'vfx-guard':'vfx-slash';
   el.style.left=target==='enemy'?'68%':'16%';el.style.top=target==='enemy'?'38%':'58%';layer.appendChild(el);setTimeout(()=>el.remove(),750);
 }
+function spawnSkillVfx(cls){const layer=$('#vfxLayer');if(!layer)return;const el=document.createElement('div');el.className=`vfx-${cls||'warden'}`;el.style.left=cls==='ranger'?'56%':'66%';el.style.top=cls==='seer'?'30%':'42%';layer.appendChild(el);setTimeout(()=>el.remove(),900);pulseClass('#scene','skill-flare',520);}
+function enemyEmote(){const p=$('#enemyPortrait');if(!p)return;p.classList.add('enemy-act');setTimeout(()=>p.classList.remove('enemy-act'),520);}
 async function showCinematic(kicker,title,text,kind='',duration=1000){
   const o=$('#cinematicOverlay');if(!o)return;o.className=`cinematic-overlay show ${kind}`;$('#cinematicKicker').textContent=kicker;$('#cinematicTitle').textContent=title;$('#cinematicText').textContent=text||'';o.classList.remove('hidden');await new Promise(r=>setTimeout(r,duration));o.classList.add('hidden');o.classList.remove('show','boss','final');
 }
+function renderEnvironment(room,run){
+  const waste=Number(room.id.split('_')[1]||0)>=33; const threat=run.clock?.threat||0;
+  const rear=$('#envRear'),mid=$('#envMid'),front=$('#envFront'); if(!rear||!mid||!front)return;
+  rear.innerHTML=`<i class="env-orb one"></i><i class="env-orb two"></i>`;
+  mid.innerHTML=Array.from({length:waste?7:5},(_,i)=>`<i class="env-particle p${i%4}"></i>`).join('');
+  front.innerHTML=`<i class="env-sweep ${waste?'wind':'ash'}"></i>${threat>=2?'<i class="env-sweep omen"></i>':''}`;
+}
+function renderSceneNPCs(room,run){
+  const stage=$('#npcStage'); if(!stage)return; const can=!run.combat&&!run.activeEvent&&!run.activeDialogue&&!run.activeShop&&!run.gameOver;
+  const actors=(room.elements||[]).filter(el=>el.action==='dialogue'&&state.world.npcs?.[el.target]);
+  stage.innerHTML=actors.map((el,i)=>{const npc=state.world.npcs[el.target],rel=run.npcRelations?.[npc.id]||0;return `<button class="scene-npc ${can?'':'disabled'}" style="left:${el.x}%;top:${Math.max(23,(el.y||47)-8)}%;--npc-delay:${i*.12}s" ${can?`data-npc-interact="${el.id}"`:''}><img src="${npc.portrait}" alt="${escapeHtml(npc.name)}"><span><b>${escapeHtml(npc.name)}</b><small>${escapeHtml(npc.title)} · ${relationshipText(rel)}</small></span></button>`}).join('');
+  $$('[data-npc-interact]').forEach(b=>b.onclick=()=>interact(b.dataset.npcInteract));
+}
+function relationshipText(v){return v>=5?'信任':v>=2?'友善':v<=-2?'戒备':v<0?'疏离':'中立';}
+function currentDialogue(run){
+  const a=run.activeDialogue;if(!a)return null;const npc=state.world.npcs?.[a.npcId],dlg=state.world.dialogues?.[a.dialogueId],node=dlg?.nodes?.[a.nodeId];return npc&&node?{npc,dlg,node}:null;
+}
+function dialogueChoiceLock(run,c){if(c.requiresFlag&&!run.flags[c.requiresFlag])return '缺少前置事实';if(c.requiresItem&&!hasItem(run,c.requiresItem))return `需要 ${state.snapshot.items[c.requiresItem]?.name||c.requiresItem}`;return '';}
+function renderDialoguePanel(run){
+  const p=$('#dialoguePanel');if(!p)return;const d=currentDialogue(run);if(!d){p.classList.add('hidden');return;}p.classList.remove('hidden');
+  $('#dialoguePortrait').src=d.npc.portrait;$('#dialogueName').textContent=d.npc.name;$('#dialogueTitle').textContent=d.npc.title;$('#dialogueFaction').textContent=d.npc.faction;$('#dialogueText').textContent=d.node.text;
+  const rel=run.npcRelations?.[d.npc.id]||0;$('#dialogueRelation').textContent=`${relationshipText(rel)} ${rel>=0?'+':''}${rel}`;
+}
+async function dialogueChoice(choiceId){if(state.busy)return;sfx('interact');await perform(`/api/runs/${state.runId}/dialogue`,{choiceId},false,'dialogue');}
+async function closeDialogue(){if(state.busy)return;await perform(`/api/runs/${state.runId}/dialogue`,{action:'close'},false,'dialogue');}
+function renderShopPanel(run){
+  const panel=$('#shopPanel');if(!panel)return;const shop=state.world.shops?.[run.activeShop];if(!shop){panel.classList.add('hidden');return;}panel.classList.remove('hidden');$('#shopName').textContent=shop.name;$('#shopGold').textContent=run.player.gold;const merchant=state.world.npcs?.[shop.npcId];const sp=$('#shopPortrait');if(sp){sp.src=merchant?.portrait||'/assets/portraits/npc_broker.svg';sp.alt=merchant?.name||'商人';}const sm=$('#shopMerchantLabel');if(sm)sm.textContent=merchant?`${merchant.name} · ${merchant.title}`:'行商';
+  const items=state.snapshot.items, tab=state.shopTab||'buy';
+  let body='';
+  if(tab==='buy') body=shop.items.map(row=>{const it=items[row.itemId],stock=run.shopStock?.[`${shop.id}:${row.itemId}`]??row.stock;return `<article class="shop-item rarity-${it?.rarity||'common'}"><span class="shop-item-icon">${it?.icon||'?'}</span><div><b>${escapeHtml(it?.name||row.itemId)}</b><small>${escapeHtml(it?.description||'')}</small><em>库存 ${stock}</em></div><button data-shop-buy="${row.itemId}" ${stock<=0||run.player.gold<row.price?'disabled':''}>◈ ${row.price}</button></article>`}).join('');
+  else {const counts={};(run.player.inventory||[]).forEach(id=>counts[id]=(counts[id]||0)+1);const eq=new Set(Object.values(run.player.equipment||{}));const sellable=Object.entries(counts).filter(([id])=>{const it=items[id];return it&&['weapon','armor','trinket','consumable'].includes(it.type)&&!eq.has(id)});body=sellable.map(([id,n])=>{const it=items[id],value=Math.max(1,Math.round((it.value||1)*shop.buyback));return `<article class="shop-item sell rarity-${it.rarity||'common'}"><span class="shop-item-icon">${it.icon}</span><div><b>${escapeHtml(it.name)} ×${n}</b><small>${escapeHtml(it.description)}</small><em>回收价</em></div><button data-shop-sell="${id}">+ ◈ ${value}</button></article>`}).join('')||'<p class="shop-empty">没有可出售的非装备物品。</p>';}
+  $('#shopContent').innerHTML=`<div class="shop-tabs"><button class="${tab==='buy'?'active':''}" data-shop-tab-panel="buy">购买</button><button class="${tab==='sell'?'active':''}" data-shop-tab-panel="sell">出售</button></div><div class="shop-grid">${body}</div>`;
+  $$('[data-shop-tab-panel]').forEach(b=>b.onclick=()=>{state.shopTab=b.dataset.shopTabPanel;renderShopPanel(run)});$$('[data-shop-buy]').forEach(b=>b.onclick=()=>shopAction('buy',b.dataset.shopBuy));$$('[data-shop-sell]').forEach(b=>b.onclick=()=>shopAction('sell',b.dataset.shopSell));
+}
+async function shopAction(action,itemId){if(state.busy)return;sfx(action==='buy'?'item':'equip');await perform(`/api/runs/${state.runId}/shop`,{shopId:state.snapshot.run.activeShop,action,itemId},false,'shop');}
+async function closeShop(){if(state.busy)return;await perform(`/api/runs/${state.runId}/shop`,{shopId:state.snapshot.run.activeShop,action:'close'},false,'shop');state.shopTab='buy';}
+async function upgradeGrowth(kind,id){if(state.busy)return;state.busy=true;try{state.snapshot=await api(`/api/runs/${state.runId}/growth`,{method:'POST',body:JSON.stringify({kind,id})});render();openGrowth();sfx('equip');toast(kind==='attribute'?'属性提升':'精通提升')}catch(e){toast(e.message);sfx('error')}finally{state.busy=false}}
 function toggleSound(){state.sound=!state.sound;$('#soundBtn').textContent=`声音 ${state.sound?'ON':'OFF'}`;if(state.sound){ensureAudio();sfx('interact');}}
 function ensureAudio(){
   if(state.audio)return state.audio;const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return null;state.audio=new Ctx();return state.audio;

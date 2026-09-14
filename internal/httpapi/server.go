@@ -42,6 +42,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/runs/{id}/item", s.item)
 	s.mux.HandleFunc("POST /api/runs/{id}/talent", s.talent)
 	s.mux.HandleFunc("POST /api/runs/{id}/interact", s.interact)
+	s.mux.HandleFunc("POST /api/runs/{id}/dialogue", s.dialogue)
+	s.mux.HandleFunc("POST /api/runs/{id}/shop", s.shop)
+	s.mux.HandleFunc("POST /api/runs/{id}/growth", s.growth)
 	s.mux.HandleFunc("POST /api/runs/{id}/save", s.manualSave)
 	s.mux.HandleFunc("POST /api/runs/{id}/tools/execute", s.executeTool)
 	s.mux.Handle("GET /", spaHandler(s.webDir))
@@ -142,6 +145,57 @@ func (s *Server) interact(w http.ResponseWriter, r *http.Request) {
 		return s.engine.Interact(run, in.ElementID)
 	})
 }
+
+func (s *Server) dialogue(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			Action   string `json:"action"`
+			ChoiceID string `json:"choiceId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		if in.Action == "close" {
+			return s.engine.CloseDialogue(run)
+		}
+		return s.engine.DialogueChoice(run, in.ChoiceID)
+	})
+}
+
+func (s *Server) shop(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			ShopID string `json:"shopId"`
+			Action string `json:"action"`
+			ItemID string `json:"itemId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		return s.engine.ShopAction(run, in.ShopID, in.Action, in.ItemID)
+	})
+}
+
+func (s *Server) growth(w http.ResponseWriter, r *http.Request) {
+	s.mutate(w, r, func(run *game.Run) error {
+		var in struct {
+			Kind string `json:"kind"`
+			ID   string `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return err
+		}
+		switch in.Kind {
+		case "attribute":
+			return s.engine.UpgradeAttribute(run, in.ID)
+		case "mastery":
+			return s.engine.UpgradeGrowth(run, in.ID)
+		default:
+			return fmt.Errorf("未知成长类型")
+		}
+	})
+}
+
 func (s *Server) manualSave(w http.ResponseWriter, r *http.Request) {
 	run, err := s.store.LoadRun(r.PathValue("id"))
 	if err != nil {
