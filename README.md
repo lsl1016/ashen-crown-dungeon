@@ -1,214 +1,128 @@
-# 灰烬王冠：沉眠墓城 v0.7.0 — Living World
+<div align="center">
 
-一个不依赖 AI 也能完整运行的本地 Dungeon / TRPG RPG 原型。
+# ♛ 灰烬王冠：沉眠墓城
 
-V0.7 在 V0.6 的双幕战役、持续世界、NPC、任务、商店、装备词条和距离战斗之上，继续把游戏推进成一个**可模拟、可编辑、未来可由 Agent 操作的 Living World Runtime**：世界事件会随钟声出现和恶化，NPC 拥有结构化日程，支线任务出现真正的分叉结局，职业技能改成数据驱动，战斗场景拥有地形危险带，并加入本地 GM Editor。
+**Ashen Crown · Tomb of Veyr**
 
-> 当前版本仍然**没有接入任何 LLM**。世界事实、规则校验、随机数、任务状态、NPC 位置、战斗结果和内容持久化都由 Game Runtime 决定。未来 DM Agent 只能通过受控 Tool 操作这些能力。
+一个单进程、零依赖、开箱即用的本地 Dungeon / TRPG RPG —
+内置 Living World 运行时、意图制战斗、分支任务图、GM 编辑器，以及一套供 AI Agent 使用的受控工具网关。
 
-本交付在 V0.7.0 上增加 **AI GM Bridge 1.0**：19 个受控 Agent Tool、JSON Schema、HTTP Tool Gateway、MCP 2026-07-28 Server、dry-run、同 Run 串行锁与 JSONL 审计。它仍然不绑定任何具体 LLM，Agent 可以通过 HTTP 或 MCP 接入。
+[快速开始](#-快速开始) · [游戏特性](#-游戏特性) · [GM-Editor](#-gm-editor) · [AI--Agent-接入](#-ai--agent-接入) · [架构](#-架构)
 
-## 直接运行
+<img src="docs/screenshots/start-screen.png" alt="灰烬王冠：沉眠墓城 - 开始画面" width="880">
 
-### Windows
-
-解压后双击：
-
-```bat
-start-windows.bat
-```
-
-然后打开：
-
-```text
-http://localhost:8080
-```
-
-GM 编辑器：
-
-```text
-http://localhost:8080/editor
-```
-
-AI Tool Gateway：
-
-```text
-GET  http://localhost:8080/api/agent/tools
-POST http://localhost:8080/api/agent/tools/execute
-```
-
-MCP Server（2026-07-28）：
-
-```text
-POST http://localhost:8080/mcp
-```
-
-完整说明：
-
-```text
-docs/AI_GM_GUIDE.md
-docs/MCP_SERVER.md
-```
-
-建议服务端设置：
-
-```bash
-export ASHEN_AGENT_TOKEN="replace-with-secret"
-export ASHEN_AGENT_REQUIRE_REASON="true"
-```
-
-> `ASHEN_AGENT_TOKEN` 为空时仅适合本地开发；公网部署必须在 Gateway 或反向代理层做认证。
-
-压缩包内已经包含 Windows amd64 可执行文件，不需要安装 Go、Node 或 npm。
-
-### Linux
-
-```bash
-chmod +x start-linux.sh dist/ashen-crown-linux-amd64
-./start-linux.sh
-```
-
-### macOS Apple Silicon
-
-```bash
-chmod +x start-macos-arm64.sh dist/ashen-crown-macos-arm64
-./start-macos-arm64.sh
-```
-
-### 源码运行
-
-```bash
-go run ./cmd/server -web ./web -data ./data
-```
+</div>
 
 ---
 
-# V0.7 核心变化
+## ✨ 这是什么
 
-## 1. 世界事件调度器
+三百年前，维尔王朝在一夜之间从史书中消失。末代国王赫里昂把自己的灵魂铸进灰烬王冠，让整座王都成为封印。如今封印重新排列墓城道路，而王座后的灰风正在变强。你收到一封没有署名的信：在第十三次钟鸣之前进入王墓，追查王冠究竟替世界锁住了什么。
 
-世界不再只通过固定 Flag 变化。V0.7 新增结构化 `WorldEventDef / WorldEventState`：
+**灰烬王冠** 是一个完整可玩的黑暗奇幻地城 RPG，同时也是一个 **Living World Runtime**：
 
-```text
-第 4 钟
-  ↓
-灰疫潮出现
-  ↓
-外墓区场景进入 plague 状态
-  ↓
-NPC 行动 / 区域描述 / 战斗危险带改变
-  ↓
-第 7 钟仍未解决
-  ↓
-事件升级
-  ↓
-玩家完成对应任务分支
-  ↓
-世界事件结束并留下持久后果
+- 🎮 **开箱即玩** — 单个 Go 二进制 + 静态前端，不需要数据库、不需要 Node/npm、不需要安装任何依赖；
+- 🌍 **活的世界** — 世界事件随钟声出现、升级与消解；NPC 拥有结构化日程与心情；区域状态持续演变；
+- ⚔️ **意图制战斗** — 敌人下一步行动可见，近 / 中 / 远三档距离与战场地形、危险带共同构成决策空间；
+- 🗺️ **分支任务图** — 支线拥有真正的分叉结局，选择会永久写入世界状态；
+- 🛠️ **本地 GM Editor** — 在浏览器里查看、编辑、覆盖所有游戏内容，并实时操控运行中的世界；
+- 🤖 **AI-ready** — 19 个受控 Agent Tool + JSON Schema 校验 + dry-run + 审计日志，通过 HTTP 或 MCP 接入任意 LLM，但世界事实永远由游戏运行时裁决。
+
+> 本项目**不绑定任何 LLM**。不接 AI 也能完整通关：规则校验、随机数、任务状态、NPC 位置和战斗结果全部由本地 Game Runtime 决定。AI 只被允许通过受控工具操作这个世界。
+
+---
+
+## 📸 游戏画面
+
+| 探索 | 战斗 |
+|:---:|:---:|
+| <img src="docs/screenshots/exploration.png" alt="场景探索" width="440"> | <img src="docs/screenshots/combat.png" alt="意图制战斗" width="440"> |
+
+**场景探索** — 点击场景热点调查、检定；NPC 立绘对话；右侧世界地图与实时世界事件面板。
+
+**意图制战斗** — 敌人 NEXT INTENT 提前可见；技能按职业动态生成；距离、地形与危险带叠加进决策。
+
+<div align="center">
+<img src="docs/screenshots/gm-editor.png" alt="GM Editor" width="880"><br>
+<sub>GM Editor — 内容库、Live Run 操控与 NPC 调度，全部通过受控 HTTP API 完成</sub>
+</div>
+
+---
+
+## 🚀 快速开始
+
+### 从源码运行（推荐）
+
+需要 Go 1.23+：
+
+```bash
+git clone https://github.com/lsl1016/ashen-crown-dungeon.git
+cd ashen-crown-dungeon
+go run ./cmd/server -web ./web -data ./data
 ```
 
-当前世界事件包括：
+打开 <http://localhost:8080> 即可开始游戏。
 
-- 灰疫潮
-- 无名游行
-- 王庭猎名
-- 灰暴锋线
+### Docker
 
-事件拥有：
-
-```text
-triggerBell
-escalateBell
-requireFlag
-resolveFlag
-severity
-overlay
-region
+```bash
+docker compose up --build
 ```
 
-同一份定义会同时被 Game Runtime、前端世界事件面板、GM Editor 和未来 Agent 使用。
+### 预编译包
 
-## 2. NPC 结构化日程
+各平台解压即玩，无需安装 Go / Node / npm：
 
-NPC 不再只有一个“当前房间”。V0.7 新增：
-
-```text
-NPCScheduleDef
-NPCWorldState
+```bash
+# Windows：双击 start-windows.bat
+# Linux
+chmod +x start-linux.sh dist/ashen-crown-linux-amd64 && ./start-linux.sh
+# macOS (Apple Silicon)
+chmod +x start-macos-arm64.sh dist/ashen-crown-macos-arm64 && ./start-macos-arm64.sh
 ```
 
-NPC 世界事实包括：
+| 入口 | 地址 |
+| --- | --- |
+| 游戏 | <http://localhost:8080> |
+| GM Editor | <http://localhost:8080/editor> |
+| Agent Tool Gateway | `GET /api/agent/tools` · `POST /api/agent/tools/execute` |
+| MCP Server | `POST /mcp` |
+
+---
+
+## 🎮 游戏特性
+
+### Living World
+
+世界不止通过剧情 Flag 变化 — 结构化的世界事件按钟声调度：
 
 ```text
-location
-activity
-health
-mood
-knowledge
+第 4 钟 ──► 灰疫潮出现 ──► 外墓区进入 plague 状态
+                                │
+              NPC 行动 / 区域描述 / 战斗危险带随之改变
+                                │
+第 7 钟仍未解决 ──► 事件升级 ──► 玩家完成对应任务分支
+                                │
+                    世界事件结束并留下持久后果
 ```
 
-例如伊文会随着钟声在断桥营火、灰疫医馆之间行动；任务结果又可以改变其最终去向。
+- **世界事件**：灰疫潮、无名游行、王庭猎名、灰暴锋线 — 每个都带 `triggerBell / escalateBell / severity / overlay` 等结构化定义；
+- **NPC 日程**：伊文会随钟声在断桥营火与灰疫医馆之间行动，任务结果还会改变其最终去向；GM 可临时固定 NPC 位置，也可恢复自动日程；
+- **场景状态**：每个房间派生 `stable / secured / danger / plague / echo / blackfire / storm` 状态，前端据真实状态切换环境 Overlay、粒子与光效。
 
-GM / 未来 AI 可以通过受控操作临时固定 NPC 到某个地点：
+### 意图制战斗
+
+战斗不是纯数值对撞。每个回合你需要综合：
 
 ```text
-NPCOverrides
+敌人 NEXT INTENT      连续突袭？重击？诅咒？
+近 / 中 / 远距离       推进 / 后撤 / 卡距离
+Battlefield Terrain   断柱掩体防御 +2、黑水侵蚀每回合掉血
+装备词条 & 职业天赋     Build 决定打法
+技能 Cost / Cooldown / Range
 ```
 
-该 Override 会真实进入存档，不会被下一次自动日程刷新覆盖；也可以恢复为自动日程。
-
-## 3. 真正的支线分叉任务图
-
-三条主要支线已经从单线：
-
-```text
-接受 → 目标 → 交付 → 奖励
-```
-
-升级成 `QuestGraph`：
-
-```text
-              ┌→ 公开赛勒记录 → 重建巡夜哨线
-巡夜队任务 ──┤
-              └→ 封存记录     → 表面秩序保留 / 真相消失
-```
-
-```text
-              ┌→ 归还真名 → 无名游行开始恢复姓名
-无名囚徒 ─────┤
-              └→ 重新封名 → 游行停止 / 真名再次被抹去
-```
-
-```text
-              ┌→ 共享路线 → 逐风者掌握安全风道
-风暴骑士 ─────┤
-              └→ 隐瞒路线 → 商路开放 / 阵营关系恶化
-```
-
-Run 新增：
-
-```text
-quest.stage
-quest.outcome
-questDecisions
-```
-
-不同结局会影响：
-
-- NPC 关系
-- NPC 行动
-- 区域状态
-- 世界事件是否解决
-- 金币 / 独特物品
-- 后续世界叙事
-
-并且已经处理“分支完成后再次对话重复领奖”的问题。
-
-## 4. 数据驱动 Skill / Effect
-
-职业技能不再把每一个行为写死在 `switch` 里。
-
-结构示例：
+职业技能是纯数据定义的 Skill / Effect 结构，新增 `heal / poison / summon / teleport` 等效果只需扩展 Effect Runtime，不需要为每个技能重写战斗流程：
 
 ```json
 {
@@ -219,408 +133,206 @@ questDecisions
   "cooldown": 3,
   "minDistance": 1,
   "maxDistance": 3,
-  "hitAttribute": "strength",
   "effects": [
-    {"type": "set_distance", "value": 1},
-    {"type": "damage", "value": 4, "dice": 6},
-    {"type": "enemy_status", "target": "weakened", "rounds": 2}
+    { "type": "set_distance", "value": 1 },
+    { "type": "damage", "value": 4, "dice": 6 },
+    { "type": "enemy_status", "target": "weakened", "rounds": 2 }
   ]
 }
 ```
 
-V0.7 内置 6 个结构化技能：
+### 分支任务图
 
-**铁誓守卫**
-- 铁誓猛击
-- 断链冲锋
-
-**暮影游侠**
-- 弱点穿刺
-- 灰幕箭
-
-**余烬术士**
-- 余烬爆裂
-- 护幕星火
-
-目前 Effect Runtime 已支持本版技能所需的：
+三条主要支线从单线任务升级为 `QuestGraph`，选择会真实影响 NPC 关系、区域状态、世界事件走向与结局叙事：
 
 ```text
-damage
-guard
-shield
-energy
-set_distance
-retreat
-enemy_status
+              ┌→ 公开赛勒记录 → 重建巡夜哨线
+巡夜队任务 ──┤
+              └→ 封存记录     → 表面秩序保留 / 真相消失
+
+              ┌→ 归还真名 → 无名游行开始恢复姓名
+无名囚徒 ─────┤
+              └→ 重新封名 → 游行停止 / 真名再次被抹去
 ```
 
-后续可以继续扩展 `heal / poison / summon / teleport / push / pull` 等，而无需为每个新技能重新写一整段战斗流程。
-
-## 5. 战场地形与危险带
-
-V0.6 的近 / 中 / 远距离现在开始和场景发生联系。
-
-例子：
+### 内容规模
 
 ```text
-断桥 / 门楼
-远距：利用断柱掩体，防御 +2
-```
-
-```text
-黑水引渠
-近距：黑水侵蚀，每回合末受伤
-```
-
-```text
-冷炉
-中距：炉底裂口造成灼灰伤害
-```
-
-```text
-雾外荒原
-中距：灰暴带造成风蚀伤害
-```
-
-世界事件还能叠加新的危险带：
-
-- 灰疫潮 → 远距孢雾
-- 无名游行 → 中距失名残响
-- 王庭猎名 → 近距黑火
-- 灰暴锋线 → 远距灰暴
-
-因此推进 / 后撤第一次同时具备：
-
-```text
-攻击距离决策
-+
-敌人 Intent 决策
-+
-战场地形决策
-```
-
-## 6. SceneState：世界变化真正改变场景
-
-每个房间现在都有派生 `SceneState`：
-
-```text
-stable
-secured
-danger
-plague
-echo
-blackfire
-storm
-```
-
-前端会根据真实场景状态改变：
-
-- 环境 Overlay
-- 粒子 / 光效
-- 区域标签
-- 世界事件展示
-- 战斗 Hazard
-
-因此“灰疫潮正在外墓区发生”不再只是一段日志文字。
-
-## 7. 本地 GM Editor
-
-访问：
-
-```text
-http://localhost:8080/editor
-```
-
-这是 V0.7 最重要的开发基础设施之一。
-
-### 内容库
-
-可以查看、搜索、新建、复制并覆盖：
-
-```text
-Item
-Enemy
-Event
-NPC
-Dialogue
-Shop
-Skill
-WorldEvent
-NPCSchedule
-QuestGraph
-```
-
-覆盖内容保存到：
-
-```text
-data/editor/content_overrides.json
-```
-
-服务重启后会自动重新加载，不需要重新编译 Go。
-
-QuestGraph 还带基础节点预览。
-
-### Live Run
-
-GM Editor 可以直接选择本地正在运行的 Run，并执行：
-
-- 推进世界钟
-- 强制触发世界事件
-- 移动 NPC
-- 恢复 NPC 自动日程
-- 修改区域状态
-- 设置世界 Flag
-- 查看当前世界事件
-- 查看 NPC 当前行为 / 地点 / 心情
-- 查看区域状态
-- 查看真实 Flag
-
-### 地点编辑器
-
-可以：
-
-- 编辑现有 Room JSON
-- 创建新地点
-- 指定地图坐标
-- 指定 Zone / Scene / Type
-- 添加场景 Element
-- 将新地点连接到已有地点
-- 查看当前 Run 的实时小地图
-
-GM 页面不会直接编辑存档文件，而是通过受控 HTTP API 调用 Game Runtime。
-
-> GM Editor 当前没有身份认证，只设计给本地开发使用。不要把该服务直接暴露到公网。
-
-## 8. V0.7 为未来 AI 增加的 Tool Boundary
-
-除原有：
-
-```text
-create_room
-connect_rooms
-reveal_room
-set_flag
-grant_item
-spawn_enemy
-```
-
-新增：
-
-```text
-move_npc
-set_region_state
-trigger_world_event
-```
-
-未来 DM Agent 依然不允许直接修改 Go / JS / 存档 JSON。
-
----
-
-# 当前内容规模
-
-```text
-44   地图地点
-133  场景交互元素
-35   剧情 / 随机事件
-21   类敌人 / Boss
-48   种物品
-18   个职业天赋
-8    种装备词条
-6    个数据驱动职业技能
-5    个持久 NPC
-5    棵 NPC 对话树
-5    套 NPC 日程定义
-3    棵分支 QuestGraph
-4    个 Living World Event
-2    套动态商店
-7    个持续变化区域
-3    档战斗距离
-104  个本地 SVG 资源
-```
-
-V0.4–V0.6 已有的双幕 Campaign、Boss 三阶段、敌人 Intent、角色动画、NPC 立绘、商店、关系、成长、装备 Build、词条、存档和 World Seed 均保留。
-
----
-
-# 操作方式
-
-## 探索
-
-- 点击场景热点调查。
-- 点击 NPC 立绘开始对话。
-- 底部行动栏提供显式操作入口。
-- 右侧地图脉冲节点可移动。
-- 部分互动需要物品、Flag、属性检定或前置世界状态。
-
-## 战斗
-
-战斗按钮现在会根据角色真正拥有的 `player.skills` 动态生成。
-
-基础行动包括：
-
-```text
-普通攻击
-职业技能 × 2
-防御
-推进
-后撤
-使用消耗品
-尝试脱离
-```
-
-应综合：
-
-```text
-敌人 NEXT INTENT
-当前近 / 中 / 远距离
-Battlefield Terrain
-当前 Hazard
-自身 / 敌人状态
-装备和词条
-职业天赋
-技能 Cost / Cooldown / Range
-```
-
-做决策。
-
----
-
-# 项目结构
-
-```text
-ashen-crown-dungeon/
-├── cmd/server/
-│   └── main.go
-├── internal/game/
-│   ├── content.go
-│   ├── content_v04.go
-│   ├── content_v05.go
-│   ├── content_v06.go
-│   ├── content_v07.go         # Skill / WorldEvent / Schedule / QuestGraph
-│   ├── editor.go              # 内容覆盖 + GM 地点操作
-│   ├── engine.go
-│   ├── generator.go
-│   ├── systems_v03.go
-│   ├── systems_v05.go
-│   ├── systems_v06.go
-│   ├── systems_v07.go         # Living World + Skill Runtime + Terrain + GM
-│   ├── tools.go
-│   ├── types.go
-│   └── store.go
-├── internal/httpapi/
-│   └── server.go
-├── web/
-│   ├── index.html
-│   ├── app.js
-│   ├── styles.css
-│   ├── editor.html
-│   ├── editor.js
-│   ├── editor.css
-│   └── assets/
-├── docs/
-│   ├── V05_SYSTEMS.md
-│   ├── V06_SYSTEMS.md
-│   ├── V07_SYSTEMS.md
-│   ├── AI_INTEGRATION.md
-│   └── ...
-├── data/
-├── dist/
-├── Dockerfile
-├── docker-compose.yml
-├── VERSION
-├── start-windows.bat
-├── start-linux.sh
-└── start-macos-arm64.sh
+44   地图地点          21   类敌人 / Boss      6    个数据驱动职业技能
+133  场景交互元素      48   种物品             5    个持久 NPC
+35   剧情 / 随机事件    18   个职业天赋          3    棵分支 QuestGraph
+8    种装备词条        5    套 NPC 日程         4    个 Living World Event
+2    套动态商店        7    个持续变化区域      104  个本地 SVG 资源
 ```
 
 ---
 
-# HTTP API
+## 🛠️ GM Editor
 
-游戏接口：
+访问 <http://localhost:8080/editor> — 本地开发与内容创作的控制台。
 
-```text
-GET  /api/health
-GET  /api/world
-GET  /api/tools
-POST /api/runs
-GET  /api/runs/{id}
-POST /api/runs/{id}/move
-POST /api/runs/{id}/interact
-POST /api/runs/{id}/action
-POST /api/runs/{id}/combat
-POST /api/runs/{id}/item
-POST /api/runs/{id}/npc
-POST /api/runs/{id}/dialogue
-POST /api/runs/{id}/shop
-POST /api/runs/{id}/growth
-POST /api/runs/{id}/talent
-POST /api/runs/{id}/save
-POST /api/runs/{id}/tools/execute
-GET  /api/saves
-POST /api/saves/{id}/load
-```
+**内容库** — 查看、搜索、新建、复制并覆盖 `Item / Enemy / Event / NPC / Dialogue / Shop / Skill / WorldEvent / NPCSchedule / QuestGraph`。覆盖保存在 `data/editor/content_overrides.json`，服务重启后自动重载，无需重新编译。QuestGraph 自带节点预览。
 
-GM Editor：
+**Live Run** — 直接操控本地正在运行的世界：推进世界钟、强制触发世界事件、移动 NPC、修改区域状态、设置世界 Flag、查看 NPC 当前行为与真实 Flag。
 
-```text
-GET  /api/editor/content
-GET  /api/editor/overrides
-GET  /api/editor/runs
-POST /api/editor/content
-POST /api/editor/runs/{id}/world
-POST /api/editor/runs/{id}/room
-```
+**地点编辑器** — 编辑或新建 Room、指定地图坐标与 Zone / Scene / Type、添加场景元素、把新地点接入已有地图，并查看当前 Run 的实时小地图。
+
+> ⚠️ GM Editor 没有身份认证，只设计给本机开发使用，不要把服务直接暴露到公网。
 
 ---
 
-# 存档兼容
+## 🤖 AI / Agent 接入
 
-`Engine.Prepare(run)` 会继续兼容 V0.5 / V0.6 Run，并补齐 V0.7 字段：
-
-```text
-player.skills
-worldEvents
-npcWorld
-sceneStates
-questDecisions
-npcOverrides
-regionOverrides
-combat.terrain
-combat.hazards
-```
-
-旧存档可以继续加载，但建议新版本从新 Run 体验完整 Living World，因为过去已经发生过的历史事件无法完全逆推出新的世界事件阶段。
-
----
-
-# AI 接入原则
-
-正式接 AI 后保持：
+未来的 DM Agent 不允许直接修改源码或存档 JSON — 它只能通过受控工具操作世界，所有世界事实由 Game Runtime 校验和裁决：
 
 ```text
 玩家自然语言
     ↓
-DM Agent
+DM Agent（任意 LLM）
     ↓
-读取真实 Run / World State
+读取真实 Run / World State        ← inspect_* / search_catalog
     ↓
-结构化意图 / Tool Call
+结构化意图 / Tool Call            ← JSON Schema 校验 + dry-run
     ↓
-Game Runtime 校验
+Game Runtime 校验与执行           ← 同 Run 串行锁
     ↓
-Run / World State 改变
+Run / World State 改变            →  JSONL 审计日志
     ↓
 前端表现
 ```
 
-AI 不直接：
+**19 个受控 Agent Tool：**
 
-- 修改 Go / JavaScript
-- 写存档 JSON
-- 自己生成骰子结果
-- 自己声明 NPC 已经移动
-- 自己宣告玩家得到物品
-- 自己决定不存在的世界事实
+```text
+世界检视   inspect_world · inspect_room · inspect_npc · inspect_quest ·
+           inspect_combat · list_world_events · recent_log · search_catalog
+世界操作   create_room · connect_rooms · reveal_room · set_flag ·
+           set_region_state · spawn_enemy · grant_item · move_npc ·
+           trigger_world_event · advance_bell
+规则模拟   roll_check
+```
 
-详见 `docs/AI_INTEGRATION.md` 与 `docs/V07_SYSTEMS.md`。
+通过 HTTP 调用：
+
+```bash
+curl -X POST http://localhost:8080/api/agent/tools/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool": "spawn_enemy",
+    "arguments": { "runId": "run_xxx", "enemyId": "ash_hound", "reason": "桥上遭遇战" }
+  }'
+```
+
+或通过 MCP（Streamable HTTP，`POST /mcp`）接入任何支持 MCP 的客户端。通用网关可以用 `POST /api/agent/tools/call/{name}` 把每个工具注册为独立 MCP Tool。
+
+**安全建议** — 公网部署必须设置：
+
+```bash
+export ASHEN_AGENT_TOKEN="replace-with-a-long-random-secret"
+export ASHEN_AGENT_REQUIRE_REASON="true"
+```
+
+配套的 Agent Skills（DM、世界导演、遭遇裁判）在 [`skills/`](skills/README.md)，接入示例在 [`examples/`](examples/)，完整规范见 [`docs/AI_GM_GUIDE.md`](docs/AI_GM_GUIDE.md) 与 [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md)。
+
+---
+
+## 🏗️ 架构
+
+单一 Go 进程承载全部逻辑；前端只做表现，永不回写世界事实：
+
+```text
+┌────────────────────────────────────────────────┐
+│  web/  静态前端（游戏 + GM Editor，原生 JS）        │
+│        表现层：实体移动 / VFX / 浮动数字 / 演出      │
+└───────────────────▲────────────────────────────┘
+                    │ HTTP (JSON)
+┌───────────────────┴────────────────────────────┐
+│  internal/httpapi     HTTP API · Agent Gateway   │
+│                      · MCP Server               │
+├────────────────────────────────────────────────┤
+│  internal/agentgateway  串行锁 · dry-run · 审计   │
+├────────────────────────────────────────────────┤
+│  internal/game        Game Runtime（唯一事实源）   │
+│    engine.go          规则执行                    │
+│    content*.go        数据驱动内容定义             │
+│    generator.go       种子化地图生成              │
+│    systems*.go        战斗 / 任务 / 世界事件 / NPC  │
+│    tools.go           GM 与 Agent 共用的受控工具    │
+├────────────────────────────────────────────────┤
+│  data/  JSON 存档（runs / saves / 内容覆盖）        │
+└────────────────────────────────────────────────┘
+```
+
+核心原则：**代码定义能力，数据定义世界，AI 只能通过受控工具操作两者。**
+
+```text
+ashen-crown-dungeon/
+├── cmd/server/          # 入口；cmd/schemaexport 导出 JSON Schema
+├── internal/game/       # Game Runtime：引擎、内容、生成器、系统、工具
+├── internal/httpapi/    # HTTP API、Agent Gateway、MCP Server
+├── internal/agentgateway/  # 串行锁、dry-run、审计
+├── web/                 # 静态前端 + 104 个本地 SVG 资源
+├── docs/                # 设计文档、系统文档、JSON Schema
+├── skills/              # 打包的 Agent Skills（DM / 世界导演 / 遭遇裁判）
+├── examples/            # Agent 接入示例
+└── data/                # 运行数据：runs、saves、内容覆盖
+```
+
+### HTTP API 一览
+
+```text
+# 游戏
+GET  /api/health                 GET  /api/world
+POST /api/runs                   GET  /api/runs/{id}
+POST /api/runs/{id}/move         POST /api/runs/{id}/interact
+POST /api/runs/{id}/action       POST /api/runs/{id}/combat
+POST /api/runs/{id}/item         POST /api/runs/{id}/npc
+POST /api/runs/{id}/dialogue     POST /api/runs/{id}/shop
+POST /api/runs/{id}/growth       POST /api/runs/{id}/talent
+POST /api/runs/{id}/save         POST /api/runs/{id}/tools/execute
+GET  /api/saves                  POST /api/saves/{id}/load
+
+# Agent
+GET  /api/agent/tools            GET  /api/agent/tools/{name}
+POST /api/agent/tools/execute    POST /api/agent/tools/call/{name}
+GET  /api/agent/audit            POST /mcp
+
+# GM Editor
+GET  /api/editor/content         GET  /api/editor/overrides
+GET  /api/editor/runs            POST /api/editor/content
+POST /api/editor/runs/{id}/world POST /api/editor/runs/{id}/room
+```
+
+---
+
+## 📚 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) | 游戏设计：职业、战斗、成长、装备词条 |
+| [docs/WORLD.md](docs/WORLD.md) | 世界观设定与双幕战役结构 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 技术架构与分层设计 |
+| [docs/AI_INTEGRATION.md](docs/AI_INTEGRATION.md) | AI 接入原则与边界 |
+| [docs/AI_GM_GUIDE.md](docs/AI_GM_GUIDE.md) | Agent Tool 使用指南 |
+| [docs/MCP_SERVER.md](docs/MCP_SERVER.md) | MCP Server 说明 |
+| [docs/MCP_TOOL_REGISTRATION.md](docs/MCP_TOOL_REGISTRATION.md) | 通用网关工具注册 |
+| [skills/README.md](skills/README.md) | 打包 Agent Skills 说明 |
+
+---
+
+## 🗺️ 方向
+
+- 更多 Effect 类型（heal / poison / summon / teleport / push / pull）与职业技能
+- 更多区域、世界事件与 QuestGraph 分支
+- 前端表现升级（引擎化渲染），HTTP API 与 Runtime 保持稳定迁移
+- DM Agent 实机接入示例与评测脚本
+
+## 🤝 参与贡献
+
+欢迎 Issue 与 PR：内容定义（物品 / 敌人 / 事件 / 任务图）、Effect Runtime 扩展、前端表现、文档改进都是很好的切入点。GM Editor 可以直接以 JSON 覆盖的形式试验新内容，改起来不需要写 Go。
+
+## ⚠️ 安全须知
+
+- 本项目设计为**本地运行**：GM Editor 与 Agent Gateway 默认无鉴权；
+- 公网部署必须设置 `ASHEN_AGENT_TOKEN`，或在反向代理层做认证与限流；
+- 存档为本地 JSON 文件，请自行做好备份。
